@@ -1,0 +1,51 @@
+Screen {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 25% 75%;
+}
+
+.sidebar {
+    height: 100%;
+    background: $primary-background;
+    border-right: $primary;
+    border-bottom: $primary;
+}
+
+#library {
+}
+
+#main {
+    row-span: 2;
+    column-span: 2;
+    border: solid green;
+    height: 100%;
+}
+
+.paper-item {
+    height: 2;
+}
+
+.modal {
+    layout: vertical;
+    align: center middle;
+}
+
+.modal-content {
+    border: thick $background;
+    background: $surface;
+    width: 80%;
+    height: 80%;
+}
+
+.dialog-content {
+    border: thick $background;
+    background: $surface;
+    width: 40%;
+    height: 20%;
+    align: center middle;
+    opacity: 0.8;
+}
+
+.error {
+    background: #840000;
+}

@@ -1,0 +1,6 @@
+#title {
+    text-align: center;
+    text-style: bold;
+    padding: 1;
+    color: $text;
+}
