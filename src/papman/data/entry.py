@@ -1,11 +1,11 @@
 from pathlib import Path
 import subprocess
+import re
 
 from xml.etree import ElementTree as ET
 import shutil
 from uuid import UUID, uuid4
 from citeproc import Citation
-
 
 
 class File:
@@ -49,6 +49,7 @@ class Entry:
     doi: str | None
     title: str | None
     authors: list[str]
+    date: str | None
     journal: str | None
 
     def __init__(
@@ -59,6 +60,7 @@ class Entry:
         citation=None,
         doi=None,
         title=None,
+        date=None,
         authors=None,
         journal=None,
     ):
@@ -69,6 +71,7 @@ class Entry:
         self.doi = doi
         self.title = title
         self.authors = authors if authors is not None else []
+        self.date = date
         self.journal = journal
 
     def __repr__(self):
@@ -106,10 +109,12 @@ class Entry:
                 if author_element.text is not None:
                     authors.append(author_element.text)
 
+        date_elem = root.find("date")
+        date = date_elem.text if date_elem is not None else None
         journal_element = root.find("journal")
         journal = journal_element.text if journal_element is not None else None
 
-        return cls(id, key, files, doi=doi, title=title, authors=authors, journal=journal)
+        return cls(id, key, files, doi=doi, title=title, authors=authors, date=date, journal=journal)
 
     def save(self, library_path: Path):
         root = ET.Element("entry", attrib={"id": str(self.id), "key": self.key})
@@ -130,6 +135,10 @@ class Entry:
         if self.journal is not None:
             journal_element = ET.SubElement(root, "journal")
             journal_element.text = self.journal
+
+        if self.date is not None:
+            date_element = ET.SubElement(root, "date")
+            date_element.text = self.date
 
         files_elem = ET.SubElement(root, "files")
         for file in self.files:
@@ -170,6 +179,40 @@ class Entry:
         self.save(library_path)
         return True, ""
 
+    @staticmethod
+    def _extract_year(citation) -> str:
+        """Best-effort year extraction from Entry/Citation; returns '' if unknown."""
+
+        def parse_regex(string):
+            # Regex to parse date-parts with year, optional month, and optional day
+            # Matches: [[year]] or [[year, month]] or [[year, month, day]]
+            date_pattern = r'\[\[(\d{4})(?:,\s*(\d{1,2}))?(?:,\s*(\d{1,2}))?\]\]'
+
+            match = re.search(date_pattern, string)
+            if match:
+                year = match.group(1)  # Always present
+                month = match.group(2)  # Optional
+                day = match.group(3)  # Optional
+                # Example: year='2022', month='4', day=None
+
+            res = f"{year}-{month}" + (f"-{day}" if day else "")
+            return res
+
+        try:
+            published = citation.get("published")
+            date = parse_regex(str(published))
+        except:
+            date = None
+
+        if date is None:
+            try:
+                issued = citation.get("issued")
+                date = parse_regex(str(issued))
+            except:
+                pass
+
+        return date
+
     @classmethod
     def from_citation(cls, id: UUID, citation: Citation, files=None, doi=None):
         key = citation.key
@@ -182,6 +225,8 @@ class Entry:
             for a in citation.author:
                 authors.append(f"{a["family"]}, {a["given"]}")
 
+        year = cls._extract_year(citation)
+
         if "journal" in citation:
             journal = str(citation.journal)
         elif "publisher" in citation:
@@ -192,4 +237,4 @@ class Entry:
         if files is None:
             files = []
 
-        return cls(id, key, files, citation=citation, doi=doi, title=title, authors=authors, journal=journal)
+        return cls(id, key, files, citation=citation, doi=doi, title=title, authors=authors, year=year, journal=journal)

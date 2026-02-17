@@ -65,6 +65,8 @@ class PapMan(App):
     @work
     async def action_import_entry(self):
         doi = await self.push_screen_wait(InputScreen("Import by DOI", "DOI"))
+        if doi is None:
+            return
 
         msg = None
         if len(doi) < 5 or len(doi) > 20:

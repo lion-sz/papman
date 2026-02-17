@@ -11,9 +11,6 @@ Screen {
     border-bottom: $primary;
 }
 
-#library {
-}
-
 #main {
     row-span: 2;
     column-span: 2;
@@ -23,6 +20,26 @@ Screen {
 
 .paper-item {
     height: 2;
+}
+
+.paper-two-line {
+    height: 3;
+}
+
+.paper-item-elem {
+    layout: grid;
+    grid-size: 3 2;
+    grid-columns: 50% 20% 30%;
+}
+
+.paper-title {
+    column-span: 3;
+}
+
+.paper-elem {
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
 }
 
 .modal {
@@ -48,4 +65,8 @@ Screen {
 
 .error {
     background: #840000;
+}
+
+.box {
+    border: solid green;
 }

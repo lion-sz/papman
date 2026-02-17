@@ -7,6 +7,25 @@ from textual.containers import Horizontal, Vertical, Grid
 from .shared import MessageScreen
 
 
+# --- new: two-line paper widget ---------------------------------------------------
+class PaperTwoLine(ListItem):
+    def __init__(self, paper):
+        super().__init__(classes="paper-two-line")
+        self.paper = paper
+
+    def compose(self) -> ComposeResult:
+        title = (self.paper.title or "").strip() or "<untitled>"
+        authors = ", ".join(self.paper.authors) if getattr(self.paper, "authors", None) else ""
+        date = self.paper.date
+        journal = (getattr(self.paper, "journal", None) or "").strip()
+
+        with Static(classes="paper-item-elem"):
+            yield Static(title, classes="paper-elem paper-title")
+            yield Label(authors, classes="paper-elem paper-author")
+            yield Label(date, classes="paper-elem")
+            yield Label(journal, classes="paper-elem")
+
+
 class PapersModule(Static):
 
     def compose(self) -> ComposeResult:
@@ -30,7 +49,7 @@ class PaperList(ListView):
     ]
 
     def __init__(self, papers):
-        papers = [PaperListItem(paper) for paper in papers]
+        papers = [PaperTwoLine(paper) for paper in papers]
         super().__init__(*papers)
 
     def action_select_cursor(self):
@@ -149,13 +168,6 @@ class PaperModal(ModalScreen):
         success, msg = self.paper.attach(path, self.app.library.path)
         if not success:
             self.app.push_screen(MessageScreen(msg))
-
-
-class PaperListItem(ListItem):
-
-    def __init__(self, paper):
-        self.paper = paper
-        super().__init__(Label(str(paper), classes="paper-item"))
 
 
 class AttachPaperScreen(ModalScreen):
