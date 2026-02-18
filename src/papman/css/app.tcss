@@ -70,3 +70,32 @@ Screen {
 .box {
     border: solid green;
 }
+
+.entry-edit-screen {
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+.entry-edit-screen Label {
+    margin-top: 1;
+}
+
+.entry-edit-screen Input {
+    width: 100%;
+}
+
+.entry-edit-screen TextArea {
+    width: 100%;
+    height: 1fr;
+    margin-top: 1;
+}
+
+.entry-edit-meta {
+    color: $text-muted;
+}
+
+.entry-edit-actions {
+    margin-top: 2;
+    align-horizontal: right;
+    width: 100%;
+}

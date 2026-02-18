@@ -1,7 +1,7 @@
 from textual import on, work
 from textual.app import App, ComposeResult, Binding
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Footer, Header, Static, Input, Button, ListView, ListItem, Label, DirectoryTree
+from textual.widgets import Footer, Header, Static, Input, Button, ListView, ListItem, Label, DirectoryTree, TextArea
 from textual.containers import Horizontal, Vertical, Grid
 
 from .shared import MessageScreen
@@ -46,6 +46,7 @@ class PaperList(ListView):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("a", "attach", "Attach Paper"),
         Binding("o", "open", "Open"),
+        Binding("e", "edit", "Edit Metadata"),
     ]
 
     def __init__(self, papers):
@@ -75,6 +76,15 @@ class PaperList(ListView):
             success, msg = paper.files[0].open()
             if not success:
                 self.app.push_screen(MessageScreen(msg))
+
+    @work
+    async def action_edit(self):
+        paper = self.highlighted_child.paper
+        bib_source = self.app.library.get_entry_bibtex_source(paper.id)
+        draft = await self.app.push_screen_wait(EntryEditScreen(bib_source))
+        if draft is not None:
+            success, msg = self.app.library.update_entry_from_bibtex(paper.id, draft)
+            self.app.push_screen(MessageScreen(msg, is_error=not success))
 
 class ImportScreen(ModalScreen):
     CSS_PATH = "css/import_screen.tcss"
@@ -192,3 +202,39 @@ class AttachPaperScreen(ModalScreen):
 
     def action_on_escape(self) -> None:
         self.dismiss(None)
+
+
+class EntryEditScreen(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+s", "save", "Done"),
+    ]
+
+    def __init__(self, bibtex_source: str):
+        super().__init__(classes="modal")
+        self.bibtex_source = bibtex_source
+
+    def compose(self):
+        with Vertical(classes="modal-content entry-edit-screen"):
+            yield Static("Edit BibTeX Source", classes="module-title")
+            yield TextArea(self.bibtex_source, id="entry-edit-bibtex")
+            with Horizontal(classes="entry-edit-actions"):
+                yield Button("Cancel", id="entry-edit-cancel")
+                yield Button("Save", id="entry-edit-done", variant="primary")
+
+    def _collect_draft(self) -> str:
+        return self.query_one("#entry-edit-bibtex", TextArea).text
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+    def action_save(self):
+        self.dismiss(self._collect_draft())
+
+    @on(Button.Pressed, "#entry-edit-cancel")
+    def on_cancel_pressed(self):
+        self.dismiss(None)
+
+    @on(Button.Pressed, "#entry-edit-done")
+    def on_done_pressed(self):
+        self.dismiss(self._collect_draft())

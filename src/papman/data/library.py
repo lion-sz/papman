@@ -1,10 +1,7 @@
-import json
-import uuid
+from uuid import UUID, uuid4
 from pathlib import Path
 import requests
 import xml.etree.ElementTree as ET
-
-from citeproc.source.json import CiteProcJSON
 
 from .entry import Entry
 from papman.config import Config
@@ -13,6 +10,7 @@ from papman.config import Config
 class Library:
 
     path: Path
+    entries: dict[UUID, Entry]
 
     def __init__(self, config: Config):
         self.path = config.library_path
@@ -34,19 +32,20 @@ class Library:
             root = tree.getroot()
 
             for entry_element in root.findall("entry"):
-                entry_id = entry_element.get("id")
-                if entry_id:
-                    entry = Entry.from_xml(self.path, uuid.UUID(entry_id), entry_element)
+                entry_id_raw = entry_element.get("id")
+                if entry_id_raw:
+                    entry_id = UUID(entry_id_raw)
+                    entry = Entry.from_xml(self.path, entry_id, entry_element)
                     self.entries[entry_id] = entry
         except ET.ParseError as e:
             print(f"Error parsing library.xml: {e}")
 
-    def find_entry_by_id(self, entry_id: str) -> Entry | None:
+    def find_entry_by_id(self, entry_id: UUID) -> Entry | None:
         """
         Find an entry by its ID.
         
         Args:
-            entry_id: The UUID string of the entry
+            entry_id: The UUID of the entry
             
         Returns:
             The Entry object if found, None otherwise
@@ -67,6 +66,38 @@ class Library:
             if entry.doi == doi:
                 return entry
         return None
+
+    def get_entry_bibtex_source(self, entry_id: UUID) -> str:
+        bib_path = self.path / f"{entry_id}.bib"
+        if not bib_path.exists():
+            return ""
+        try:
+            return bib_path.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+    def update_entry_from_bibtex(self, entry_id: UUID, bibtex_source: str) -> tuple[bool, str]:
+        entry = self.find_entry_by_id(entry_id)
+        if entry is None:
+            return False, f"Entry not found: {entry_id}"
+
+        try:
+            candidate = Entry.from_bibtex(bibtex_source, id=entry.id, files=entry.files)
+        except ValueError as e:
+            return False, str(e)
+
+        if candidate.doi:
+            existing = self.find_entry_by_doi(candidate.doi)
+            if existing is not None and existing.id != entry.id:
+                return False, f"DOI already exists on a different entry: {candidate.doi}"
+        try:
+            candidate.save_with_bibtex_source(self.path, bibtex_source)
+        except OSError as e:
+            return False, f"Error saving entry '{entry_id}': {str(e)}"
+
+        self.entries[entry_id] = candidate
+        self.populate()
+        return True, "Entry updated."
 
     def populate(self):
         """
@@ -107,28 +138,29 @@ class Library:
             return True, "Entry already exists."
 
         url = f"https://doi.org/{doi}"
-        headers = {"Accept": "application/vnd.citationstyles.csl+json"}
+        headers = {"Accept": "application/x-bibtex"}
 
-        response = requests.get(url, headers=headers)
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
+        except requests.RequestException as e:
+            return False, f"Error: Request failed: {str(e)}"
 
         if response.status_code != 200:
             return False, f"Error: Request failed with status code {response.status_code}"
 
-        content_type = response.headers.get("Content-Type", "")
-        if "application/vnd.citationstyles.csl+json" not in content_type:
-            return False, f"Error: Expected JSON content type, but got {content_type}"
+        bibtex_raw = response.text.strip()
+        if not bibtex_raw:
+            return False, "Error: Empty BibTeX response from DOI endpoint."
 
-        data = json.loads(response.text)
+        id = uuid4()
         try:
-            data["id"] = doi
-            citation = CiteProcJSON([data])
-            citation = citation[doi]
-        except Exception as e:
-            return False, f"Error parsing JSON: {str(e)}"
-        id = uuid.uuid4()
-        entry = Entry.from_citation(id, citation, files=[], doi=doi)
-        entry.save(self.path)
-        with open(self.path / f"{id}.json", "w") as f:
-            f.write(json.dumps(data, indent=2))
+            entry = Entry.from_bibtex(bibtex_raw, id=id, files=[], doi=doi)
+            entry.save_with_bibtex_source(self.path, bibtex_raw)
+        except ValueError as e:
+            return False, str(e)
+        except OSError as e:
+            return False, f"Error saving entry '{id}': {str(e)}"
+
+        self.entries[id] = entry
         self.populate()
         return True, f"Entry saved with ID: {id}"

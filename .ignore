@@ -1,0 +1,12 @@
+.git/
+.venv/
+.idea/
+__pycache__/
+build/
+dist/
+*.egg-info/
+*.pyc
+
+# Large local artifacts not useful for code discovery
+hi.json
+hi.josn
