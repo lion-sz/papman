@@ -1,8 +1,17 @@
 from textual import on, work
-from textual.app import App, ComposeResult, Binding
-from textual.screen import ModalScreen, Screen
-from textual.widgets import Footer, Header, Static, Input, Button, ListView, ListItem, Label, DirectoryTree, TextArea
-from textual.containers import Horizontal, Vertical, Grid
+from textual.app import ComposeResult, Binding
+from textual.screen import ModalScreen
+from textual.widgets import (
+    Static,
+    Input,
+    Button,
+    ListView,
+    ListItem,
+    Label,
+    DirectoryTree,
+    TextArea,
+)
+from textual.containers import Horizontal, Vertical
 
 from .shared import MessageScreen
 
@@ -15,7 +24,11 @@ class PaperTwoLine(ListItem):
 
     def compose(self) -> ComposeResult:
         title = (self.paper.title or "").strip() or "<untitled>"
-        authors = ", ".join(self.paper.authors) if getattr(self.paper, "authors", None) else ""
+        authors = (
+            ", ".join(self.paper.authors)
+            if getattr(self.paper, "authors", None)
+            else ""
+        )
         date = self.paper.date
         journal = (getattr(self.paper, "journal", None) or "").strip()
 
@@ -27,7 +40,6 @@ class PaperTwoLine(ListItem):
 
 
 class PapersModule(Static):
-
     def compose(self) -> ComposeResult:
         papers = list(self.app.library.entries.values())
         with Vertical():
@@ -36,6 +48,17 @@ class PapersModule(Static):
 
     def on_mount(self):
         self.query_one(PaperList).focus()
+
+    def refresh(self, *args, **kwargs):
+        papers = list(self.app.library.entries.values())
+        new_list = PaperList(papers)
+        old_list = self.query_one(PaperList)
+        had_focus = old_list.has_focus
+        old_list.remove()
+        self.query_one(Vertical).mount(new_list)
+        if had_focus:
+            new_list.focus()
+        return super().refresh(*args, **kwargs)
 
 
 class PaperList(ListView):
@@ -85,6 +108,10 @@ class PaperList(ListView):
         if draft is not None:
             success, msg = self.app.library.update_entry_from_bibtex(paper.id, draft)
             self.app.push_screen(MessageScreen(msg, is_error=not success))
+            if success:
+                self.app.query_one(PapersModule).refresh()
+        self.app.query_one(PapersModule).refresh()
+
 
 class ImportScreen(ModalScreen):
     CSS_PATH = "css/import_screen.tcss"
@@ -181,10 +208,7 @@ class PaperModal(ModalScreen):
 
 
 class AttachPaperScreen(ModalScreen):
-
-    BINDINGS = [
-        ("escape", "on_escape", "Close")
-    ]
+    BINDINGS = [("escape", "on_escape", "Close")]
 
     def __init__(self):
         super().__init__(classes="modal")

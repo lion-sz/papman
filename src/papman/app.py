@@ -1,12 +1,10 @@
-from textual import on, work
+from textual import work
 from textual.reactive import reactive
-from textual.app import App, ComposeResult, Binding
-from textual.screen import ModalScreen, Screen
-from textual.widgets import Footer, Header, Static, Input, Button, ListView, ListItem, Label, DirectoryTree
-from textual.containers import Horizontal, Vertical, Grid
+from textual.app import App, ComposeResult
+from textual.widgets import Footer, Header, Static
 
 from .config import Config, load_config
-from .paper import PapersModule, ImportScreen
+from .paper import PapersModule
 from .collection import CollectionPanel, NewCollectionScreen, CollectionSidebar
 from .shared import MessageScreen, InputScreen
 from .data.library import Library
@@ -14,7 +12,6 @@ from .data.collection import Collection, load_collection
 
 
 class MainModule(Static):
-
     content = reactive("paper", recompose=True)
 
     def compose(self):
@@ -77,7 +74,7 @@ class PapMan(App):
             await self.push_screen_wait(MessageScreen(msg, is_error=True))
             return
         success, res = self.app.library.load_entry_from_doi(doi)
-        self.app.push_screen(MessageScreen(res, is_error=False))
+        self.query_one(PapersModule).refresh()
 
     @work
     async def action_new_collection(self):
