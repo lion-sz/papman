@@ -99,3 +99,17 @@ Screen {
     align-horizontal: right;
     width: 100%;
 }
+
+#search-modal {
+    padding: 1 2;
+}
+
+#search-results {
+    height: 1fr;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+#search-query {
+    dock: bottom;
+}

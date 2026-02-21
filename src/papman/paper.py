@@ -1,6 +1,7 @@
 from textual import on, work
 from textual.app import ComposeResult, Binding
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import (
     Static,
     Input,
@@ -77,9 +78,9 @@ class PaperList(ListView):
         Binding("e", "edit", "Edit Metadata"),
     ]
 
-    def __init__(self, papers):
+    def __init__(self, papers, id=None):
         papers = [PaperTwoLine(paper) for paper in papers]
-        super().__init__(*papers)
+        super().__init__(*papers, id=id)
 
     def action_select_cursor(self):
         paper = self.highlighted_child.paper
@@ -191,15 +192,12 @@ class PaperModal(ModalScreen):
         super().__init__(classes="modal")
 
     def compose(self):
-        authors = " and ".join(self.paper.authors)
         journal = self.paper.journal
         if journal is None:
             journal = "Journal not found"
-        if authors is None:
-            raise ValueError("No authors for paper")
         with Vertical(id="paper-modal", classes="modal-content"):
             yield Label(self.paper.title, id="title")
-            yield Label(authors)
+            yield Label(self.paper.author_str)
             yield Label(journal)
 
             if len(self.paper.files) > 0:
@@ -273,3 +271,71 @@ class EntryEditScreen(ModalScreen):
     @on(Button.Pressed, "#entry-edit-done")
     def on_done_pressed(self):
         self.dismiss(self._collect_draft())
+
+
+class SearchScreen(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "close", "Close"),
+    ]
+
+    def __init__(self):
+        super().__init__(classes="modal")
+        self._search_timer: Timer | None = None
+
+    def compose(self):
+        with Vertical(id="search-modal", classes="modal-content"):
+            yield PaperList([], id="search-results")
+            yield Input(placeholder="Type to search...", id="search-query")
+
+    def on_mount(self):
+        self.query_one("#search-query", Input).focus()
+
+    def action_close(self):
+        self.dismiss(None)
+
+    @on(Input.Changed, "#search-query")
+    def on_search_input_changed(self, event: Input.Changed):
+        if self._search_timer is not None:
+            self._search_timer.stop()
+        self._search_timer = self.set_timer(0.2, lambda: self._run_search(event.value))
+
+    @on(Input.Submitted, "#search-query")
+    def on_search_input_submitted(self, _: Input.Submitted):
+        results = self.query_one("#search-results", PaperList)
+        if len(results.children) == 0:
+            return
+        if results.index is None:
+            results.index = 0
+        results.focus()
+
+    @work(exclusive=True)
+    async def _run_search(self, query: str):
+        # Placeholder for future, real search backend integration.
+        papers = self._search_papers(query)
+        results = self.query_one("#search-results", PaperList)
+        had_focus = results.has_focus
+        old_index = results.index
+        results.clear()
+        for paper in papers:
+            results.append(PaperTwoLine(paper))
+
+        if old_index is not None and len(results.children) > 0:
+            results.index = min(old_index, len(results.children) - 1)
+        if had_focus:
+            results.focus()
+
+    def _search_papers(self, query: str):
+        papers = list(self.app.library.entries.values())
+        q = query.strip().lower()
+        if not q:
+            return papers
+
+        def matches(paper):
+            haystack = [
+                paper.title or "",
+                paper.author_str,
+            ]
+            text = " ".join(haystack).lower()
+            return q in text
+
+        return [paper for paper in papers if matches(paper)]

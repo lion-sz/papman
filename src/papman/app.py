@@ -4,7 +4,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static
 
 from .config import Config, load_config
-from .paper import PapersModule
+from .paper import PapersModule, SearchScreen
 from .collection import CollectionPanel, NewCollectionScreen, CollectionSidebar
 from .shared import MessageScreen, InputScreen
 from .data.library import Library
@@ -29,6 +29,7 @@ class PapMan(App):
         ("c", "collection", "Collection"),
         ("i", "import_entry", "Import"),
         ("n", "new_collection", "New Collection"),
+        ("/", "search", "Search"),
     ]
 
     collection: Collection
@@ -58,6 +59,9 @@ class PapMan(App):
 
     def action_collection(self):
         self.query_one(MainModule).content = "collection"
+
+    def action_search(self):
+        self.push_screen(SearchScreen())
 
     @work
     async def action_import_entry(self):

@@ -77,16 +77,11 @@ class Entry:
     def __repr__(self):
         return f"{self.title}"
 
-    def data(self) -> dict:
-        return {
-            "id": str(self.id),
-            "key": self.key,
-            "doi": self.doi,
-            "title": self.title,
-            "authors": list(self.authors),
-            "date": self.date,
-            "journal": self.journal,
-        }
+    @property
+    def author_str(self) -> str:
+        if self.authors is None:
+            return "No authors"
+        return " AND ".join(self.authors)
 
     @classmethod
     def load(cls, library_path: Path, id: UUID) -> "Entry":
