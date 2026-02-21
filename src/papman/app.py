@@ -74,7 +74,7 @@ class PapMan(App):
             await self.push_screen_wait(MessageScreen(msg, is_error=True))
             return
         success, res = self.app.library.load_entry_from_doi(doi)
-        self.query_one(PapersModule).refresh()
+        self.query_one(PapersModule).reload_papers()
 
     @work
     async def action_new_collection(self):

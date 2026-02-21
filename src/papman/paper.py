@@ -49,16 +49,21 @@ class PapersModule(Static):
     def on_mount(self):
         self.query_one(PaperList).focus()
 
-    def refresh(self, *args, **kwargs):
+    @work(exclusive=True)
+    async def reload_papers(self):
         papers = list(self.app.library.entries.values())
         new_list = PaperList(papers)
         old_list = self.query_one(PaperList)
         had_focus = old_list.has_focus
-        old_list.remove()
-        self.query_one(Vertical).mount(new_list)
+        old_index = old_list.index
+
+        await old_list.remove()
+        await self.query_one(Vertical).mount(new_list)
+
+        if old_index is not None and len(new_list.children) > 0:
+            new_list.index = min(old_index, len(new_list.children) - 1)
         if had_focus:
             new_list.focus()
-        return super().refresh(*args, **kwargs)
 
 
 class PaperList(ListView):
@@ -78,6 +83,8 @@ class PaperList(ListView):
 
     def action_select_cursor(self):
         paper = self.highlighted_child.paper
+        if paper is None:
+            raise ValueError("No paper selected")
         self.app.push_screen(PaperModal(paper))
 
     def action_refresh(self):
@@ -109,8 +116,7 @@ class PaperList(ListView):
             success, msg = self.app.library.update_entry_from_bibtex(paper.id, draft)
             self.app.push_screen(MessageScreen(msg, is_error=not success))
             if success:
-                self.app.query_one(PapersModule).refresh()
-        self.app.query_one(PapersModule).refresh()
+                self.app.query_one(PapersModule).reload_papers()
 
 
 class ImportScreen(ModalScreen):
@@ -185,11 +191,16 @@ class PaperModal(ModalScreen):
         super().__init__(classes="modal")
 
     def compose(self):
-        authors = "and ".join(self.paper.authors)
+        authors = " and ".join(self.paper.authors)
+        journal = self.paper.journal
+        if journal is None:
+            journal = "Journal not found"
+        if authors is None:
+            raise ValueError("No authors for paper")
         with Vertical(id="paper-modal", classes="modal-content"):
             yield Label(self.paper.title, id="title")
             yield Label(authors)
-            yield Label(self.paper.journal)
+            yield Label(journal)
 
             if len(self.paper.files) > 0:
                 yield Static("Files:")

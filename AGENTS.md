@@ -9,7 +9,6 @@
   - `.venv/`, `.git/`, `.idea/`, `__pycache__/`, `build/`, `dist/`
 - Prefer:
   - `scripts/code-search "<pattern>" src` for text
-  - `find src -type f` for file lists
 
 ## Why
 
