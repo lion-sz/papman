@@ -47,7 +47,7 @@ class PapMan(App):
 
         yield Static("Library", id="library", classes="sidebar")
         yield MainModule()
-        yield CollectionSidebar(self.collection, id="collection", classes="sidebar")
+        yield CollectionSidebar(self.collection)
 
         yield Footer()
 
@@ -82,6 +82,13 @@ class PapMan(App):
 
     @work
     async def action_new_collection(self):
+        if self.collection is not None:
+            return None
         collection = await self.app.push_screen_wait(NewCollectionScreen())
-        self.push_screen(MessageScreen(collection.name))
-        self.query_one(CollectionSidebar).collection = "collection"
+        if collection is None:
+            return
+        msg = f"Created collection {collection.name}"
+        self.push_screen(MessageScreen(msg))
+        self.collection = collection
+        self.query_one(CollectionSidebar).refresh()
+        self.query_one(CollectionSidebar).refresh()

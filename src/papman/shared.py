@@ -6,14 +6,13 @@ from textual import on
 
 
 class MessageScreen(ModalScreen):
-
     BINDINGS = [
         Binding("q", "dismiss_modal", "Close", show=False),
         Binding("escape", "dismiss_modal", "Close", show=False),
         Binding("enter", "dismiss_modal", "Close", show=False),
     ]
 
-    def __init__(self, msg, is_error=True):
+    def __init__(self, msg, is_error=False):
         self.msg = msg
         self.is_error = is_error
         super().__init__(classes="modal")

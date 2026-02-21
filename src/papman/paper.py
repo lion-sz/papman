@@ -15,6 +15,7 @@ from textual.widgets import (
 from textual.containers import Horizontal, Vertical
 
 from .shared import MessageScreen
+from .data.entry import Entry
 
 
 # --- new: two-line paper widget ---------------------------------------------------
@@ -34,7 +35,7 @@ class PaperTwoLine(ListItem):
         journal = (getattr(self.paper, "journal", None) or "").strip()
 
         with Static(classes="paper-item-elem"):
-            yield Static(title, classes="paper-elem paper-title")
+            yield Label(title, classes="paper-elem paper-title")
             yield Label(authors, classes="paper-elem paper-author")
             yield Label(date, classes="paper-elem")
             yield Label(journal, classes="paper-elem")
@@ -93,13 +94,21 @@ class PaperList(ListView):
 
     @work
     async def action_attach(self):
-        key = await self.app.push_screen_wait(AttachPaperScreen())
+        paper = self.highlighted_child.paper
+        if paper.id in self.app.collection.papers:
+            self.app.push_screen(MessageScreen("Paper already attached", is_error=True))
+            return
+        key = await self.app.push_screen_wait(AttachPaperScreen(paper))
         if key is None:
             return
-        paper = self.highlighted_child.paper
+        if self.app.collection is None:
+            self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
+            return
         success, msg = self.app.collection.attach(paper, key)
         if not success:
             self.app.push_screen(MessageScreen(msg))
+        else:
+            self.app.query_one("#collection-sidebar").refresh()
 
     def action_open(self):
         paper = self.highlighted_child.paper
@@ -219,17 +228,17 @@ class PaperModal(ModalScreen):
 class AttachPaperScreen(ModalScreen):
     BINDINGS = [("escape", "on_escape", "Close")]
 
-    def __init__(self):
+    def __init__(self, paper: Entry):
+        self.paper = paper
         super().__init__(classes="modal")
 
     def compose(self):
         with Vertical(classes="modal-content"):
             yield Static("Attach Paper to Collection")
-            yield Input(placeholder="Citation Key")
-            yield Button("Attach", id="attach-btn")
+            yield Input(placeholder=self.paper.key, id="attach-input")
 
-    @on(Button.Pressed, "#attach-btn")
-    def action_attach(self, event: Button.Pressed):
+    @on(Input.Submitted, "#attach-input")
+    def action_attach(self, event: Input.Submitted):
         key = self.query_one(Input).value
         self.dismiss(key)
 

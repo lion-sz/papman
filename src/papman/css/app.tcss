@@ -18,10 +18,6 @@ Screen {
     height: 100%;
 }
 
-.paper-item {
-    height: 2;
-}
-
 .paper-two-line {
     height: 3;
 }
@@ -34,12 +30,15 @@ Screen {
 
 .paper-title {
     column-span: 3;
+    text-overflow: clip;
 }
 
 .paper-elem {
     width: 100%;
     padding: 0;
-    overflow: hidden;
+    text-overflow: clip;
+    text-wrap: nowrap;
+    height: 1;
 }
 
 .modal {
