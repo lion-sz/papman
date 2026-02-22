@@ -4,7 +4,6 @@ from pathlib import Path
 import tomllib
 
 
-
 class Config(NamedTuple):
     library_path: Path
 
@@ -31,7 +30,6 @@ def load_config(config_path: str | Path | None = None) -> Config:
     if env_path:
         candidates.append(Path(env_path))
 
-    candidates.append(Path.cwd() / "papman.toml")
     candidates.append(Path("~/.config/papman/config.toml").expanduser())
 
     chosen: Path | None = next((p for p in candidates if p.exists()), None)
