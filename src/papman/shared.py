@@ -3,7 +3,7 @@ from typing import Iterable
 
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Input, DirectoryTree
+from textual.widgets import Static, Button, Input, DirectoryTree, Footer
 from textual.app import Binding, ComposeResult
 from textual.message import Message
 from textual import on
@@ -12,8 +12,8 @@ from textual import on
 class MessageScreen(ModalScreen):
     BINDINGS = [
         Binding("q", "dismiss_modal", "Close", show=False),
-        Binding("escape", "dismiss_modal", "Close", show=False),
-        Binding("enter", "dismiss_modal", "Close", show=False),
+        Binding("escape", "dismiss_modal", "Close"),
+        Binding("enter", "dismiss_modal", "Close"),
     ]
 
     def __init__(self, msg, is_error=False):
@@ -27,6 +27,7 @@ class MessageScreen(ModalScreen):
             classes += " error"
         with Vertical(classes=classes):
             yield Static(self.msg)
+        yield Footer()
 
     def action_dismiss_modal(self):
         self.dismiss(None)
@@ -34,7 +35,7 @@ class MessageScreen(ModalScreen):
 
 class InputScreen(ModalScreen):
     BINDINGS = [
-        Binding("escape", "dismiss_modal", "Close", show=False),
+        Binding("escape", "dismiss_modal", "Close"),
     ]
 
     def __init__(self, msg: str | None = None, placeholder: str = "", callback=None):
@@ -48,6 +49,7 @@ class InputScreen(ModalScreen):
             if self.msg:
                 yield Static(self.msg)
             yield Input(placeholder=self.placeholder, classes="input")
+        yield Footer()
 
     def action_dismiss_modal(self):
         self.dismiss(None)
@@ -63,8 +65,8 @@ class InputScreen(ModalScreen):
 class ConfirmScreen(ModalScreen):
     BINDINGS = [
         Binding("q", "dismiss_modal", "Close", show=False),
-        Binding("escape", "dismiss_modal", "Close", show=False),
-        Binding("enter", "confirm", "Confirm", show=False),
+        Binding("escape", "dismiss_modal", "Close"),
+        Binding("enter", "confirm", "Confirm"),
     ]
 
     def __init__(self, msg: str):
@@ -77,6 +79,7 @@ class ConfirmScreen(ModalScreen):
             with Horizontal():
                 yield Button("Confirm", id="confirm-btn", variant="primary")
                 yield Button("Cancel", id="cancel-btn")
+        yield Footer()
 
     def action_dismiss_modal(self):
         self.dismiss(False)

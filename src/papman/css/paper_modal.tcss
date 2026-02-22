@@ -1,6 +1,68 @@
+#paper-modal {
+    padding: 1 2;
+    overflow-y: auto;
+}
+
+#paper-header {
+    width: 100%;
+    height: auto;
+    align-horizontal: center;
+    margin-bottom: 0;
+}
+
+#paper-key {
+    width: auto;
+    padding: 0 2;
+    margin-bottom: 1;
+    border: round $primary;
+    background: $surface;
+    color: $primary;
+    text-style: bold;
+}
+
 #title {
+    width: 100%;
     text-align: center;
     text-style: bold;
-    padding: 1;
+    padding: 0 1;
     color: $text;
+    margin-bottom: 1;
+}
+
+#paper-authors {
+    width: 100%;
+    text-align: center;
+    color: $text;
+    margin-bottom: 1;
+}
+
+#paper-meta {
+    width: 100%;
+    text-align: center;
+    color: $text-muted;
+}
+
+.paper-section {
+    width: 100%;
+    height: auto;
+    border: round $background;
+    background: $surface;
+    padding: 1;
+    margin-top: 0;
+}
+
+.paper-section-title {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+#paper-tags {
+    width: 100%;
+    color: $text;
+}
+
+.paper-file {
+    width: 100%;
+    padding: 0 1;
 }

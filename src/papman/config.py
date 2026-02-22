@@ -40,7 +40,8 @@ def load_config(config_path: str | Path | None = None) -> Config:
         data = tomllib.loads(raw.decode("utf-8"))
 
     library = data.get("library", {})
-    library_path = library.get("path", "./test_lib")
+    assert "path" in library, "Library path not specified in config"
+    library_path = library["path"]
 
     # Normalize to a string path (expanded). Keep it simple and predictable.
     normalized = Path(library_path).expanduser()

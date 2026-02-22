@@ -5,7 +5,7 @@ from textual import on, work
 from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.screen import ModalScreen
-from textual.widgets import Static, Input
+from textual.widgets import Static, Input, Footer
 from textual.containers import Vertical
 
 from .shared import MessageScreen, ConfirmScreen
@@ -88,6 +88,7 @@ class NewCollectionScreen(ModalScreen):
         with Vertical(classes="modal-content"):
             yield Static("Creating a new Collection")
             yield Input(placeholder="Enter Collection Name", id="create_collection")
+        yield Footer()
 
     @on(Input.Submitted, "#create_collection")
     def on_submit(self, event: Input.Submitted):

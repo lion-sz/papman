@@ -6,6 +6,7 @@ from textual.widgets import (
     Static,
     Input,
     Button,
+    Footer,
     ListView,
     ListItem,
     Label,
@@ -151,6 +152,7 @@ class ImportScreen(ModalScreen):
         with Vertical(id="import-screen", classes="modal-content"):
             yield Static("Importing by DOI")
             yield Input(placeholder="Enter DOI", id="doi-input")
+        yield Footer()
 
     @on(Input.Submitted, "#doi-input")
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -181,6 +183,7 @@ class FilePickerScreen(ModalScreen):
         with Vertical(classes="modal-content"):
             yield Static("Select a file", classes="module-title")
             yield FilteredDirectoryTree("~", id="file-tree")
+        yield Footer()
 
     @on(FilteredDirectoryTree.FileChosen)
     def on_file_chosen(self, event: FilteredDirectoryTree.FileChosen) -> None:
@@ -204,19 +207,32 @@ class PaperModal(ModalScreen):
         super().__init__(classes="modal")
 
     def compose(self):
-        journal = self.paper.journal
-        if journal is None:
+        title = (self.paper.title or "").strip() or "<untitled>"
+        authors = (getattr(self.paper, "author_str", None) or "").strip()
+        if not authors:
+            authors = "Unknown authors"
+        journal = (self.paper.journal or "").strip() if self.paper.journal else ""
+        if not journal:
             journal = "Journal not found"
+        date = (getattr(self.paper, "date", None) or "").strip() or "Date unknown"
+
         with Vertical(id="paper-modal", classes="modal-content"):
-            yield Label(self.paper.title, id="title")
-            yield Label(self.paper.author_str)
-            yield Label(journal)
-            yield Label(self._tags_text(), id="paper-tags")
+            with Vertical(id="paper-header"):
+                yield Static(self.paper.key, id="paper-key")
+                yield Label(title, id="title")
+                yield Label(authors, id="paper-authors")
+                yield Label(f"{date}  |  {journal}", id="paper-meta")
+
+            with Vertical(classes="paper-section"):
+                yield Static("Tags", classes="paper-section-title")
+                yield Label(self._tags_text(), id="paper-tags")
 
             if len(self.paper.files) > 0:
-                yield Static("Files:")
-                for f in self.paper.files:
-                    yield Static(f.name)
+                with Vertical(classes="paper-section"):
+                    yield Static("Files", classes="paper-section-title")
+                    for f in self.paper.files:
+                        yield Static(f.name, classes="paper-file")
+        yield Footer()
 
     def action_on_escape(self) -> None:
         self.app.pop_screen()
@@ -245,8 +261,8 @@ class PaperModal(ModalScreen):
 
     def _tags_text(self) -> str:
         if not getattr(self.paper, "tags", None):
-            return "Tags: none"
-        return f"Tags: {', '.join(self.paper.tags)}"
+            return "none"
+        return ", ".join(self.paper.tags)
 
 
 class AttachPaperScreen(ModalScreen):
@@ -260,6 +276,7 @@ class AttachPaperScreen(ModalScreen):
         with Vertical(classes="modal-content"):
             yield Static("Attach Paper to Collection")
             yield Input(placeholder=self.paper.key, id="attach-input")
+        yield Footer()
 
     @on(Input.Submitted, "#attach-input")
     def action_attach(self, event: Input.Submitted):
@@ -287,6 +304,7 @@ class EntryEditScreen(ModalScreen):
             with Horizontal(classes="entry-edit-actions"):
                 yield Button("Cancel", id="entry-edit-cancel")
                 yield Button("Save", id="entry-edit-done", variant="primary")
+        yield Footer()
 
     def _collect_draft(self) -> str:
         return self.query_one("#entry-edit-bibtex", TextArea).text
@@ -319,6 +337,7 @@ class SearchScreen(ModalScreen):
         with Vertical(id="search-modal", classes="modal-content"):
             yield PaperList([], id="search-results")
             yield Input(placeholder="Type to search... use <tag>", id="search-query")
+        yield Footer()
 
     def on_mount(self):
         self.query_one("#search-query", Input).focus()
