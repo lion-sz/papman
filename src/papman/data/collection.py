@@ -2,10 +2,6 @@ from uuid import UUID
 from pathlib import Path
 
 import xml.etree.ElementTree as ET
-from textual.screen import ModalScreen
-from textual.containers import Vertical
-from textual.widgets import Static, Input
-
 
 from .entry import Entry
 
@@ -14,7 +10,7 @@ def load_collection(library_path: Path):
     """
     Check the current working directory for a 'collection.xml' file.
     If it exists, load it through the Collection class.
-    
+
     Returns:
         Collection | None: The loaded Collection object if the file exists, None otherwise.
     """
@@ -27,7 +23,6 @@ def load_collection(library_path: Path):
 
 
 class Collection:
-
     path: Path
     name: str
     papers: dict[UUID, tuple[str, Entry]]
@@ -45,7 +40,7 @@ class Collection:
                 "id": str(uuid),
                 "key": key,
             }
-            entry_element = ET.SubElement(root, "entry", attrib=attrib)
+            ET.SubElement(root, "entry", attrib=attrib)
 
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
@@ -80,5 +75,12 @@ class Collection:
         if exists:
             return False, "Paper already attached."
         self.papers[paper.id] = (key, paper)
+        self.save()
+        return True, ""
+
+    def remove(self, paper_id: UUID) -> tuple[bool, str]:
+        if paper_id not in self.papers:
+            return False, "Paper is not in the collection."
+        del self.papers[paper_id]
         self.save()
         return True, ""

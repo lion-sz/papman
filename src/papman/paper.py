@@ -17,13 +17,14 @@ from .shared import MessageScreen, FilteredDirectoryTree
 from .data.entry import Entry
 
 
-# --- new: two-line paper widget ---------------------------------------------------
-class PaperTwoLine(ListItem):
-    def __init__(self, paper):
-        super().__init__(classes="paper-two-line")
+class PaperListItem(ListItem):
+    def __init__(self, paper, key=None):
+        super().__init__(classes="paper-item")
         self.paper = paper
+        self.key = key
 
     def compose(self) -> ComposeResult:
+        key = self.key if self.key is not None else self.paper.key
         title = (self.paper.title or "").strip() or "<untitled>"
         authors = (
             ", ".join(self.paper.authors)
@@ -33,11 +34,12 @@ class PaperTwoLine(ListItem):
         date = self.paper.date
         journal = (getattr(self.paper, "journal", None) or "").strip()
 
-        with Static(classes="paper-item-elem"):
-            yield Label(title, classes="paper-elem paper-title")
-            yield Label(authors, classes="paper-elem paper-author")
-            yield Label(date, classes="paper-elem")
-            yield Label(journal, classes="paper-elem")
+        with Static(classes="paper-item-grid"):
+            yield Label(key, classes="paper-item-label paper-key")
+            yield Label(title, classes="paper-item-label paper-title")
+            yield Label(authors, classes="paper-item-label paper-author")
+            yield Label(date, classes="paper-item-label")
+            yield Label(journal, classes="paper-item-label")
 
 
 class PapersModule(Static):
@@ -78,9 +80,14 @@ class PaperList(ListView):
         Binding("e", "edit", "Edit Metadata"),
     ]
 
-    def __init__(self, papers, id=None):
-        papers = [PaperTwoLine(paper) for paper in papers]
-        super().__init__(*papers, id=id)
+    def __init__(self, papers: list[Entry], keys: list[str] = None, id=None):
+        items = []
+        for i, p in enumerate(papers):
+            if keys is not None:
+                items.append(PaperListItem(p, keys[i]))
+            else:
+                items.append(PaperListItem(p))
+        super().__init__(*items, id=id)
 
     def action_select_cursor(self):
         paper = self.highlighted_child.paper
@@ -318,7 +325,7 @@ class SearchScreen(ModalScreen):
         old_index = results.index
         results.clear()
         for paper in papers:
-            results.append(PaperTwoLine(paper))
+            results.append(PaperListItem(paper))
 
         if old_index is not None and len(results.children) > 0:
             results.index = min(old_index, len(results.children) - 1)

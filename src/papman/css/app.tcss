@@ -18,27 +18,30 @@ Screen {
     height: 100%;
 }
 
-.paper-two-line {
+.paper-item{
     height: 3;
 }
 
-.paper-item-elem {
+.paper-item-grid{
     layout: grid;
-    grid-size: 3 2;
-    grid-columns: 50% 20% 30%;
+    grid-size: 4 2;
+    grid-columns: 20% 30% 20% 30%;
 }
 
-.paper-title {
-    column-span: 3;
-    text-overflow: clip;
-}
-
-.paper-elem {
+.paper-item-label{
     width: 100%;
     padding: 0;
     text-overflow: clip;
     text-wrap: nowrap;
     height: 1;
+}
+
+.paper-title {
+    column-span: 3;
+}
+
+.paper-author {
+    column-span: 2;
 }
 
 .modal {
