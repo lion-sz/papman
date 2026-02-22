@@ -1,7 +1,11 @@
+from pathlib import Path
+from typing import Iterable
+
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Input
+from textual.widgets import Static, Button, Input, DirectoryTree
 from textual.app import Binding, ComposeResult
+from textual.message import Message
 from textual import on
 
 
@@ -87,3 +91,32 @@ class ConfirmScreen(ModalScreen):
     @on(Button.Pressed, "#cancel-btn")
     def on_cancel_pressed(self):
         self.dismiss(False)
+
+
+class FilteredDirectoryTree(DirectoryTree):
+    class FileChosen(Message):
+        bubble: bool = True
+
+        def __init__(self, tree: "FilteredDirectoryTree", path: Path) -> None:
+            self._tree = tree
+            self.path = path
+            super().__init__()
+
+    BINDINGS = [
+        Binding("enter", "select_cursor", "Select"),
+        Binding("escape", "on_escape", "Close"),
+        Binding("j", "cursor_down", "Down"),
+        Binding("k", "cursor_up", "Up"),
+    ]
+
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        return [path for path in paths if not path.name.startswith(".")]
+
+    def action_select_cursor(self):
+        node = self.cursor_node
+        if node.allow_expand:
+            node.expand()
+        else:
+            msg = self.FileChosen(self, node.data.path)
+            self.post_message(msg)
+        return

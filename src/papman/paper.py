@@ -9,12 +9,11 @@ from textual.widgets import (
     ListView,
     ListItem,
     Label,
-    DirectoryTree,
     TextArea,
 )
 from textual.containers import Horizontal, Vertical
 
-from .shared import MessageScreen
+from .shared import MessageScreen, FilteredDirectoryTree
 from .data.entry import Entry
 
 
@@ -171,21 +170,14 @@ class FilePickerScreen(ModalScreen):
     def compose(self):
         with Vertical(classes="modal-content"):
             yield Static("Select a file", classes="module-title")
-            yield DirectoryTree("~", id="file-tree")
-            with Horizontal():
-                yield Button("Cancel", id="cancel-btn")
-                yield Button("Select", id="select-btn")
+            yield FilteredDirectoryTree("~", id="file-tree")
 
-    @on(Button.Pressed, "#cancel-btn")
-    def on_cancel_pressed(self) -> None:
-        self.app.pop_screen()
-
-    @on(Button.Pressed, "#select-btn")
-    def on_select_pressed(self) -> None:
-        tree = self.query_one("#file-tree", DirectoryTree)
-        if tree.cursor_node:
-            path = tree.cursor_node.data.path
-            self.dismiss(str(path))
+    @on(FilteredDirectoryTree.FileChosen)
+    def on_file_chosen(self, event: FilteredDirectoryTree.FileChosen) -> None:
+        self.selected_file = event.path
+        path = event.path
+        self.log(f"Selected file: {path} ({type(path)})")
+        self.dismiss(path)
 
 
 class PaperModal(ModalScreen):
