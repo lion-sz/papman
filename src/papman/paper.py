@@ -13,7 +13,7 @@ from textual.widgets import (
 )
 from textual.containers import Horizontal, Vertical
 
-from .shared import MessageScreen, FilteredDirectoryTree
+from .shared import MessageScreen, FilteredDirectoryTree, InputScreen
 from .data.entry import Entry
 
 
@@ -33,6 +33,7 @@ class PaperListItem(ListItem):
         )
         date = self.paper.date
         journal = (getattr(self.paper, "journal", None) or "").strip()
+        tags_str = ", ".join(self.paper.tags)
 
         with Static(classes="paper-item-grid"):
             yield Label(key, classes="paper-item-label paper-key")
@@ -40,6 +41,8 @@ class PaperListItem(ListItem):
             yield Label(authors, classes="paper-item-label paper-author")
             yield Label(date, classes="paper-item-label")
             yield Label(journal, classes="paper-item-label")
+            yield Label("", classes="paper-item-label")
+            yield Label(tags_str, classes="paper-item-label paper-tags")
 
 
 class PapersModule(Static):
@@ -193,6 +196,7 @@ class PaperModal(ModalScreen):
         ("escape", "on_escape", "Close"),
         ("a", "attach", "Attach File"),
         ("c", "collect", "Add to Collection"),
+        ("t", "add_tag", "Edit Tags"),
     ]
 
     def __init__(self, paper):
@@ -207,6 +211,7 @@ class PaperModal(ModalScreen):
             yield Label(self.paper.title, id="title")
             yield Label(self.paper.author_str)
             yield Label(journal)
+            yield Label(self._tags_text(), id="paper-tags")
 
             if len(self.paper.files) > 0:
                 yield Static("Files:")
@@ -222,6 +227,26 @@ class PaperModal(ModalScreen):
         success, msg = self.paper.attach(path, self.app.library.path)
         if not success:
             self.app.push_screen(MessageScreen(msg))
+
+    @work
+    async def action_add_tag(self):
+        new_tag = await self.app.push_screen_wait(InputScreen("Add tag to paper"))
+        if new_tag is None:
+            return
+
+        new_tag = new_tag.strip()
+        if new_tag in self.paper.tags:
+            return
+        self.paper.tags.append(new_tag)
+        self.paper.save(self.app.library.path)
+        self.app.library.populate()
+        for item in self.app.query(PaperList):
+            item.refresh()
+
+    def _tags_text(self) -> str:
+        if not getattr(self.paper, "tags", None):
+            return "Tags: none"
+        return f"Tags: {', '.join(self.paper.tags)}"
 
 
 class AttachPaperScreen(ModalScreen):
@@ -293,7 +318,7 @@ class SearchScreen(ModalScreen):
     def compose(self):
         with Vertical(id="search-modal", classes="modal-content"):
             yield PaperList([], id="search-results")
-            yield Input(placeholder="Type to search...", id="search-query")
+            yield Input(placeholder="Type to search... use <tag>", id="search-query")
 
     def on_mount(self):
         self.query_one("#search-query", Input).focus()
@@ -338,12 +363,32 @@ class SearchScreen(ModalScreen):
         if not q:
             return papers
 
+        tokens = query.strip().split()
+        tag_terms: list[str] = []
+        text_tokens: list[str] = []
+        for token in tokens:
+            if len(token) >= 3 and token.startswith("<") and token.endswith(">"):
+                tag = token[1:-1].strip().lower()
+                if tag:
+                    tag_terms.append(tag)
+                    continue
+            text_tokens.append(token.lower())
+        text_query = " ".join(text_tokens).strip()
+
         def matches(paper):
+            paper_tags = {tag.lower() for tag in getattr(paper, "tags", [])}
+            if any(tag not in paper_tags for tag in tag_terms):
+                return False
+            if not text_query:
+                return True
+
             haystack = [
                 paper.title or "",
                 paper.author_str,
+                getattr(paper, "journal", None) or "",
+                getattr(paper, "key", "") or "",
             ]
             text = " ".join(haystack).lower()
-            return q in text
+            return text_query in text
 
         return [paper for paper in papers if matches(paper)]

@@ -27,7 +27,7 @@ class File:
     def open(self) -> tuple[bool, str]:
         """
         Opens the file with the default application in a new process.
-        
+
         Returns:
             tuple[bool, str]: (success, error_message)
         """
@@ -35,14 +35,17 @@ class File:
             return False, f"File not found: {self.path}"
 
         try:
-            subprocess.Popen(['xdg-open', str(self.path)],
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            subprocess.Popen(
+                ["xdg-open", str(self.path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             return True, ""
         except FileNotFoundError:
             return False, "xdg-open not found. Please install xdg-utils."
         except Exception as e:
             return False, f"Error opening file: {str(e)}"
+
 
 class Entry:
     id: UUID
@@ -53,6 +56,7 @@ class Entry:
     authors: list[str]
     date: str | None
     journal: str | None
+    tags: list[str]
 
     def __init__(
         self,
@@ -64,6 +68,7 @@ class Entry:
         date=None,
         authors=None,
         journal=None,
+        tags=None,
     ):
         self.id = id
         self.key = key
@@ -73,6 +78,7 @@ class Entry:
         self.authors = authors if authors is not None else []
         self.date = date
         self.journal = journal
+        self.tags = tags if tags is not None else []
 
     def __repr__(self):
         return f"{self.title}"
@@ -120,11 +126,24 @@ class Entry:
         date = date_elem.text if date_elem is not None else None
         journal_element = root.find("journal")
         journal = journal_element.text if journal_element is not None else None
+        tags_elem = root.find("tags")
+        tags = [tag.text for tag in tags_elem.findall("tag")]
 
-        return cls(id, key, files, doi=doi, title=title, authors=authors, date=date, journal=journal)
+        return cls(
+            id,
+            key,
+            files,
+            doi=doi,
+            title=title,
+            authors=authors,
+            date=date,
+            journal=journal,
+            tags=tags,
+        )
 
     def save(self, library_path: Path):
-        root = ET.Element("entry", attrib={"id": str(self.id), "key": self.key})
+        attrib = {"id": str(self.id), "key": self.key}
+        root = ET.Element("entry", attrib=attrib)
 
         if self.doi is not None:
             doi_element = ET.SubElement(root, "doi")
@@ -150,13 +169,21 @@ class Entry:
         files_elem = ET.SubElement(root, "files")
         for file in self.files:
             ET.SubElement(
-                files_elem, "file",
+                files_elem,
+                "file",
                 attrib={"id": str(file.id), "name": file.name, "path": file.path.name},
             )
 
+        tag_elem = ET.SubElement(root, "tags")
+        for tag in self.tags:
+            t = ET.SubElement(tag_elem, "tag")
+            t.text = tag
+
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
-        tree.write(library_path / f"{self.id}.xml", encoding="utf-8", xml_declaration=True)
+        tree.write(
+            library_path / f"{self.id}.xml", encoding="utf-8", xml_declaration=True
+        )
 
     def attach(self, file_path: Path, library_path: Path) -> tuple[bool, str]:
         """
@@ -246,6 +273,7 @@ class Entry:
         id: UUID | None = None,
         files: list[File] | None = None,
         doi: str | None = None,
+        tags: list[str] | None = None,
     ) -> "Entry":
         raw = (source or "").strip()
         if not raw:
@@ -290,7 +318,17 @@ class Entry:
         if files is None:
             files = []
 
-        return cls(entry_id, key, files, doi=doi_value, title=title, authors=authors, date=date, journal=journal)
+        return cls(
+            entry_id,
+            key,
+            files,
+            doi=doi_value,
+            title=title,
+            authors=authors,
+            date=date,
+            journal=journal,
+            tags=tags,
+        )
 
     def save_with_bibtex_source(self, library_path: Path, bibtex_source: str):
         bib_path = library_path / f"{self.id}.bib"
@@ -331,7 +369,9 @@ class Entry:
         bib_path = library_path / f"{self.id}.bib"
         try:
             if bib_path.exists():
-                library = bibtexparser.parse_string(bib_path.read_text(encoding="utf-8"))
+                library = bibtexparser.parse_string(
+                    bib_path.read_text(encoding="utf-8")
+                )
             else:
                 library = bibtexparser.Library()
         except Exception as e:
@@ -346,8 +386,12 @@ class Entry:
 
         bib_entry.key = self.key
         self._set_or_remove_bib_field(bib_entry, "doi", self._normalize_value(self.doi))
-        self._set_or_remove_bib_field(bib_entry, "title", self._normalize_value(self.title))
-        self._set_or_remove_bib_field(bib_entry, "author", self._authors_to_bibtex(self.authors))
+        self._set_or_remove_bib_field(
+            bib_entry, "title", self._normalize_value(self.title)
+        )
+        self._set_or_remove_bib_field(
+            bib_entry, "author", self._authors_to_bibtex(self.authors)
+        )
 
         date_value = self._normalize_value(self.date)
         self._set_or_remove_bib_field(bib_entry, "date", date_value)
@@ -356,7 +400,9 @@ class Entry:
         self._set_or_remove_bib_field(bib_entry, "month", month)
 
         # Keep the canonical venue field aligned with entry metadata.
-        self._set_or_remove_bib_field(bib_entry, "journal", self._normalize_value(self.journal))
+        self._set_or_remove_bib_field(
+            bib_entry, "journal", self._normalize_value(self.journal)
+        )
 
         try:
             bib_path.write_text(bibtexparser.write_string(library), encoding="utf-8")

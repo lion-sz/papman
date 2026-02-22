@@ -8,7 +8,6 @@ from papman.config import Config
 
 
 class Library:
-
     path: Path
     entries: dict[UUID, Entry]
 
@@ -43,10 +42,10 @@ class Library:
     def find_entry_by_id(self, entry_id: UUID) -> Entry | None:
         """
         Find an entry by its ID.
-        
+
         Args:
             entry_id: The UUID of the entry
-            
+
         Returns:
             The Entry object if found, None otherwise
         """
@@ -55,10 +54,10 @@ class Library:
     def find_entry_by_doi(self, doi: str) -> Entry | None:
         """
         Find an entry by its DOI.
-        
+
         Args:
             doi: The DOI string of the entry
-            
+
         Returns:
             The Entry object if found, None otherwise
         """
@@ -76,20 +75,30 @@ class Library:
         except OSError:
             return ""
 
-    def update_entry_from_bibtex(self, entry_id: UUID, bibtex_source: str) -> tuple[bool, str]:
+    def update_entry_from_bibtex(
+        self, entry_id: UUID, bibtex_source: str
+    ) -> tuple[bool, str]:
         entry = self.find_entry_by_id(entry_id)
         if entry is None:
             return False, f"Entry not found: {entry_id}"
 
         try:
-            candidate = Entry.from_bibtex(bibtex_source, id=entry.id, files=entry.files)
+            candidate = Entry.from_bibtex(
+                bibtex_source,
+                id=entry.id,
+                files=entry.files,
+                tags=entry.tags,
+            )
         except ValueError as e:
             return False, str(e)
 
         if candidate.doi:
             existing = self.find_entry_by_doi(candidate.doi)
             if existing is not None and existing.id != entry.id:
-                return False, f"DOI already exists on a different entry: {candidate.doi}"
+                return (
+                    False,
+                    f"DOI already exists on a different entry: {candidate.doi}",
+                )
         try:
             candidate.save_with_bibtex_source(self.path, bibtex_source)
         except OSError as e:
@@ -146,7 +155,10 @@ class Library:
             return False, f"Error: Request failed: {str(e)}"
 
         if response.status_code != 200:
-            return False, f"Error: Request failed with status code {response.status_code}"
+            return (
+                False,
+                f"Error: Request failed with status code {response.status_code}",
+            )
 
         bibtex_raw = response.text.strip()
         if not bibtex_raw:

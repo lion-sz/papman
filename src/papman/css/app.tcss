@@ -19,12 +19,12 @@ Screen {
 }
 
 .paper-item{
-    height: 3;
+    height: 4;
 }
 
 .paper-item-grid{
     layout: grid;
-    grid-size: 4 2;
+    grid-size: 4 3;
     grid-columns: 20% 30% 20% 30%;
 }
 
@@ -42,6 +42,10 @@ Screen {
 
 .paper-author {
     column-span: 2;
+}
+
+.paper-tags {
+    column-span: 3;
 }
 
 .modal {
