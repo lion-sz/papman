@@ -57,6 +57,7 @@ class Entry:
     date: str | None
     journal: str | None
     tags: list[str]
+    notes: str | None
 
     def __init__(
         self,
@@ -69,6 +70,7 @@ class Entry:
         authors=None,
         journal=None,
         tags=None,
+        notes=None,
     ):
         self.id = id
         self.key = key
@@ -79,6 +81,7 @@ class Entry:
         self.date = date
         self.journal = journal
         self.tags = tags if tags is not None else []
+        self.notes = notes
 
     def __repr__(self):
         return f"{self.title}"
@@ -126,6 +129,8 @@ class Entry:
         date = date_elem.text if date_elem is not None else None
         journal_element = root.find("journal")
         journal = journal_element.text if journal_element is not None else None
+        notes_element = root.find("notes")
+        notes = notes_element.text if notes_element is not None else None
         tags_elem = root.find("tags")
         tags = [tag.text for tag in tags_elem.findall("tag")]
 
@@ -139,6 +144,7 @@ class Entry:
             date=date,
             journal=journal,
             tags=tags,
+            notes=notes,
         )
 
     def save(self, library_path: Path):
@@ -165,6 +171,10 @@ class Entry:
         if self.date is not None:
             date_element = ET.SubElement(root, "date")
             date_element.text = self.date
+
+        if self.notes is not None:
+            notes_element = ET.SubElement(root, "notes")
+            notes_element.text = self.notes
 
         files_elem = ET.SubElement(root, "files")
         for file in self.files:
@@ -274,6 +284,7 @@ class Entry:
         files: list[File] | None = None,
         doi: str | None = None,
         tags: list[str] | None = None,
+        notes: str | None = None,
     ) -> "Entry":
         raw = (source or "").strip()
         if not raw:
@@ -328,6 +339,7 @@ class Entry:
             date=date,
             journal=journal,
             tags=tags,
+            notes=notes,
         )
 
     def save_with_bibtex_source(self, library_path: Path, bibtex_source: str):

@@ -1,3 +1,7 @@
+import subprocess
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 from textual import on, work
 from textual.app import ComposeResult, Binding
 from textual.screen import ModalScreen
@@ -11,6 +15,7 @@ from textual.widgets import (
     ListItem,
     Label,
     TextArea,
+    Markdown,
 )
 from textual.containers import Horizontal, Vertical
 
@@ -200,6 +205,7 @@ class PaperModal(ModalScreen):
         ("a", "attach", "Attach File"),
         ("c", "collect", "Add to Collection"),
         ("t", "add_tag", "Edit Tags"),
+        ("n", "edit_notes", "Edit Notes"),
     ]
 
     def __init__(self, paper):
@@ -232,6 +238,10 @@ class PaperModal(ModalScreen):
                     yield Static("Files", classes="paper-section-title")
                     for f in self.paper.files:
                         yield Static(f.name, classes="paper-file")
+
+            with Vertical(classes="paper-section", id="paper-notes-section"):
+                yield Static("Notes", classes="paper-section-title")
+                yield Markdown(self._notes_markdown(), id="paper-notes")
         yield Footer()
 
     def action_on_escape(self) -> None:
@@ -259,10 +269,62 @@ class PaperModal(ModalScreen):
         for item in self.app.query(PaperList):
             item.refresh()
 
+    def action_edit_notes(self):
+        temp_path: Path | None = None
+        old_notes = self.paper.notes or ""
+        try:
+            with NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                suffix=".md",
+                prefix="papman-notes-",
+                dir="/tmp",
+                delete=False,
+            ) as temp_file:
+                temp_file.write(old_notes)
+                temp_path = Path(temp_file.name)
+
+            with self.app.suspend():
+                return_code = subprocess.call(["nvim", str(temp_path)])
+
+            if return_code != 0:
+                self.app.push_screen(
+                    MessageScreen("nvim exited with non-zero status", is_error=True)
+                )
+                return
+
+            new_notes = temp_path.read_text(encoding="utf-8")
+            self.paper.notes = new_notes
+            self.paper.save(self.app.library.path)
+            self.app.library.populate()
+            self._refresh_notes_view()
+        except FileNotFoundError:
+            self.app.push_screen(MessageScreen("nvim not found", is_error=True))
+        except OSError as e:
+            self.app.push_screen(
+                MessageScreen(f"Could not edit notes: {str(e)}", is_error=True)
+            )
+        finally:
+            if temp_path is not None:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
     def _tags_text(self) -> str:
         if not getattr(self.paper, "tags", None):
             return "none"
         return ", ".join(self.paper.tags)
+
+    def _notes_markdown(self) -> str:
+        notes = self.paper.notes or ""
+        if notes.strip():
+            return notes
+        return "_No notes yet. Press `n` to edit._"
+
+    def _refresh_notes_view(self) -> None:
+        notes_view = self.query_one("#paper-notes", Markdown)
+        notes_view.update(self._notes_markdown())
 
 
 class AttachPaperScreen(ModalScreen):

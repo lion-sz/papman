@@ -1,6 +1,7 @@
 #paper-modal {
     padding: 1 2;
-    overflow-y: auto;
+    height: 100%;
+    overflow: hidden;
 }
 
 #paper-header {
@@ -65,4 +66,15 @@
 .paper-file {
     width: 100%;
     padding: 0 1;
+}
+
+#paper-notes-section {
+    height: 1fr;
+    min-height: 8;
+}
+
+#paper-notes {
+    width: 100%;
+    height: 1fr;
+    overflow-y: auto;
 }
