@@ -70,7 +70,7 @@ class PapMan(App):
             return
 
         msg = None
-        if len(doi) < 5 or len(doi) > 20:
+        if len(doi) < 5 or len(doi) > 40:
             msg = f"Doi length is not good: '{doi}'"
         elif "/" not in doi:
             msg = f"Doi does not contain a slash: '{doi}'"

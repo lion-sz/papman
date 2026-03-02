@@ -144,36 +144,6 @@ class PaperList(ListView):
                 self.app.query_one(PapersModule).reload_papers()
 
 
-class ImportScreen(ModalScreen):
-    CSS_PATH = "css/import_screen.tcss"
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Exit"),
-    ]
-
-    def __init__(self):
-        super().__init__(classes="modal")
-
-    def compose(self):
-        with Vertical(id="import-screen", classes="modal-content"):
-            yield Static("Importing by DOI")
-            yield Input(placeholder="Enter DOI", id="doi-input")
-        yield Footer()
-
-    @on(Input.Submitted, "#doi-input")
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        doi = event.value
-        msg = None
-        if len(doi) < 5 or len(doi) > 20:
-            msg = f"Doi length is not good: '{doi}'"
-        elif "/" not in doi:
-            msg = f"Doi does not contain a slash: '{doi}'"
-        if msg is not None:
-            self.app.push_screen(MessageScreen(msg, is_error=True))
-            return
-        success, res = self.app.library.load_entry_from_doi(event.value)
-        self.app.push_screen(MessageScreen(res, is_error=False))
-
-
 class FilePickerScreen(ModalScreen):
     BINDINGS = [
         ("escape", "app.pop_screen", "Cancel"),
