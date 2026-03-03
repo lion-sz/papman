@@ -14,7 +14,6 @@ Screen {
 #main {
     row-span: 2;
     column-span: 2;
-    border: solid green;
     height: 100%;
 }
 

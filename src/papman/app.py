@@ -46,7 +46,7 @@ class PapMan(App):
         yield Header()
 
         yield Static("Library", id="library", classes="sidebar")
-        yield MainModule()
+        yield MainModule(id="main")
         yield CollectionSidebar(self.collection)
 
         yield Footer()
