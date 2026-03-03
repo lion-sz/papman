@@ -174,6 +174,7 @@ class PaperModal(ModalScreen):
         ("escape", "on_escape", "Close"),
         ("a", "attach", "Attach File"),
         ("c", "collect", "Add to Collection"),
+        ("l", "add_to_reading_list", "Add to Reading List"),
         ("t", "add_tag", "Edit Tags"),
         ("n", "edit_notes", "Edit Notes"),
     ]
@@ -238,6 +239,26 @@ class PaperModal(ModalScreen):
         self.app.library.populate()
         for item in self.app.query(PaperList):
             item.refresh()
+
+    @work
+    async def action_add_to_reading_list(self):
+        reading_lists = self.app.library.reading_lists
+        if len(reading_lists.lists) == 0:
+            self.app.push_screen(
+                MessageScreen("No reading lists available. Create one in the sidebar.")
+            )
+            return
+
+        selected_list = await self.app.push_screen_wait(
+            SelectReadingListScreen(reading_lists)
+        )
+        if selected_list is None:
+            return
+
+        success, msg = reading_lists.add_paper(selected_list, self.paper.id)
+        self.app.push_screen(MessageScreen(msg, is_error=not success))
+        if success:
+            self.app.query_one("#readinglist-sidebar").refresh(recompose=True)
 
     def action_edit_notes(self):
         temp_path: Path | None = None
@@ -317,6 +338,67 @@ class AttachPaperScreen(ModalScreen):
 
     def action_on_escape(self) -> None:
         self.dismiss(None)
+
+
+class ReadingListItem(ListItem):
+    def __init__(self, list_name: str, paper_count: int):
+        super().__init__()
+        self.list_name = list_name
+        self.paper_count = paper_count
+
+    def compose(self):
+        paper_label = "paper" if self.paper_count == 1 else "papers"
+        yield Label(f"{self.list_name} ({self.paper_count} {paper_label})")
+
+
+class SelectReadingListScreen(ModalScreen):
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("enter", "select", "Select"),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+    ]
+
+    def __init__(self, reading_lists):
+        super().__init__(classes="modal")
+        self.reading_lists = reading_lists
+
+    def compose(self):
+        with Vertical(classes="modal-content"):
+            yield Static("Add paper to reading list", classes="module-title")
+            items = [
+                ReadingListItem(reading_list.name, reading_list.paper_count)
+                for reading_list in sorted(
+                    self.reading_lists.lists.values(),
+                    key=lambda x: x.name.lower(),
+                )
+            ]
+            yield ListView(*items, id="reading-list-picker")
+        yield Footer()
+
+    def on_mount(self):
+        picker = self.query_one("#reading-list-picker", ListView)
+        if len(picker.children) > 0:
+            picker.index = 0
+        picker.focus()
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+    def action_select(self):
+        picker = self.query_one("#reading-list-picker", ListView)
+        if picker.highlighted_child is None:
+            self.dismiss(None)
+            return
+        self.dismiss(picker.highlighted_child.list_name)
+
+    @on(ListView.Selected, "#reading-list-picker")
+    def on_pick_reading_list(self, event: ListView.Selected):
+        item = event.item
+        if item is None:
+            self.dismiss(None)
+            return
+        self.dismiss(item.list_name)
 
 
 class EntryEditScreen(ModalScreen):
