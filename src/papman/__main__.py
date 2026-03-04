@@ -1,5 +1,10 @@
 from .app import PapMan
 
-if __name__ == "__main__":
+
+def main() -> None:
     papman = PapMan()
     papman.run()
+
+
+if __name__ == "__main__":
+    main()
