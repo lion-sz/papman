@@ -110,14 +110,14 @@ class PaperList(ListView):
     @work
     async def action_attach(self):
         paper = self.highlighted_child.paper
+        if self.app.collection is None:
+            self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
+            return
         if paper.id in self.app.collection.papers:
             self.app.push_screen(MessageScreen("Paper already attached", is_error=True))
             return
         key = await self.app.push_screen_wait(AttachPaperScreen(paper))
         if key is None:
-            return
-        if self.app.collection is None:
-            self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
             return
         success, msg = self.app.collection.attach(paper, key)
         if not success:
