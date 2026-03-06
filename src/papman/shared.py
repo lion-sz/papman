@@ -3,10 +3,17 @@ from typing import Iterable
 
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Input, DirectoryTree, Footer
+from textual.widgets import Static, Button, Input, DirectoryTree, Footer, ListView
 from textual.app import Binding, ComposeResult
 from textual.message import Message
 from textual import on
+
+
+class VimNavigableListView(ListView):
+    BINDINGS = [
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+    ]
 
 
 class MessageScreen(ModalScreen):

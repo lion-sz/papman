@@ -7,7 +7,7 @@ from textual.containers import Vertical
 from .config import Config, load_config
 from .paper import PapersModule, SearchScreen, PaperList
 from .collection import CollectionPanel, NewCollectionScreen, CollectionSidebar
-from .shared import MessageScreen, InputScreen
+from .shared import MessageScreen, InputScreen, VimNavigableListView
 from .data.library import Library
 from .data.collection import Collection, load_collection
 
@@ -35,11 +35,9 @@ class ReadingListSidebarItem(ListItem):
         yield Label(f"{self.list_name} ({self.paper_count} {paper_label})")
 
 
-class ReadingListsList(ListView):
+class ReadingListsList(VimNavigableListView):
     BINDINGS = [
         ("enter", "select_cursor", "Select"),
-        ("j", "cursor_down", "Down"),
-        ("k", "cursor_up", "Up"),
     ]
 
 

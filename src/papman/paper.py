@@ -20,6 +20,7 @@ from textual.widgets import (
 from textual.containers import Horizontal, Vertical
 
 from .shared import MessageScreen, FilteredDirectoryTree, InputScreen
+from .shared import VimNavigableListView
 from .data.entry import Entry
 
 
@@ -78,12 +79,10 @@ class PapersModule(Static):
             new_list.focus()
 
 
-class PaperList(ListView):
+class PaperList(VimNavigableListView):
     BINDINGS = [
         Binding("enter", "select_cursor", "Select"),
         Binding("r", "refresh", "Refresh Library"),
-        Binding("k", "cursor_up", "Up", show=False),
-        Binding("j", "cursor_down", "Down", show=False),
         Binding("a", "attach", "Attach Paper"),
         Binding("o", "open", "Open"),
         Binding("e", "edit", "Edit Metadata"),
@@ -355,8 +354,6 @@ class SelectReadingListScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
         Binding("enter", "select", "Select"),
-        Binding("j", "cursor_down", "Down", show=False),
-        Binding("k", "cursor_up", "Up", show=False),
     ]
 
     def __init__(self, reading_lists):
@@ -373,7 +370,7 @@ class SelectReadingListScreen(ModalScreen):
                     key=lambda x: x.name.lower(),
                 )
             ]
-            yield ListView(*items, id="reading-list-picker")
+            yield VimNavigableListView(*items, id="reading-list-picker")
         yield Footer()
 
     def on_mount(self):
