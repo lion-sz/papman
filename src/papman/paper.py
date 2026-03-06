@@ -122,7 +122,9 @@ class PaperList(VimNavigableListView):
         if not success:
             self.app.push_screen(MessageScreen(msg))
         else:
-            self.app.query_one("#collection-sidebar").refresh()
+            self.app.query_one("#main-sidebar").reload_sidebar(
+                section_to_focus="collection"
+            )
 
     def action_open(self):
         paper = self.highlighted_child.paper
@@ -257,7 +259,9 @@ class PaperModal(ModalScreen):
         success, msg = reading_lists.add_paper(selected_list, self.paper.id)
         self.app.push_screen(MessageScreen(msg, is_error=not success))
         if success:
-            self.app.query_one("#readinglist-sidebar").refresh(recompose=True)
+            self.app.query_one("#main-sidebar").reload_sidebar(
+                section_to_focus="reading_lists"
+            )
 
     def action_edit_notes(self):
         temp_path: Path | None = None

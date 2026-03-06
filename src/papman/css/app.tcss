@@ -4,42 +4,24 @@ Screen {
     grid-columns: 25% 75%;
 }
 
-.sidebar {
+#main-sidebar {
     layout: vertical;
     height: 100%;
     background: $primary-background;
     border-right: $primary;
-    border-bottom: $primary;
-}
-
-#reading-lists-body {
-    height: 1fr;
     padding: 0 1;
 }
 
-#reading-lists-list {
+#sidebar-list {
     background: $primary-background;
     border: none;
 }
 
-#reading-lists-list > ListItem {
+#sidebar-list > ListItem {
     background: $primary-background;
-}
-
-#new-reading-list {
-    width: auto;
-    min-width: 0;
-    height: 1;
-    margin: 0 0 1 0;
-    align-horizontal: center;
-    padding: 0 1;
-    background: transparent;
-    border: none;
 }
 
 #main {
-    row-span: 2;
-    column-span: 2;
     height: 100%;
 }
 

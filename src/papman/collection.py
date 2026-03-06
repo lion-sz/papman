@@ -74,7 +74,9 @@ class CollectionPanel(Static):
             self.app.push_screen(MessageScreen(msg, is_error=True))
             return
 
-        self.app.query_one("#collection-sidebar").refresh()
+        self.app.query_one("#main-sidebar").reload_sidebar(
+            section_to_focus="collection"
+        )
         self.app.query_one("CollectionPanel").refresh(recompose=True)
 
 
