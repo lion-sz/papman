@@ -85,6 +85,13 @@ class MainSidebar(Static):
                         "meta",
                     )
                 )
+            rows.append(
+                SidebarRowItem(
+                    "  + new collection",
+                    row_kind="new_collection",
+                    section="collection",
+                )
+            )
 
         rows.append(
             SidebarRowItem(
@@ -214,6 +221,20 @@ class MainSidebar(Static):
             self.app.query_one(MainModule).content = "reading_list"
         elif item.row_kind == "new_reading_list":
             self.create_reading_list()
+        elif item.row_kind == "new_collection":
+            self.create_new_collection()
+
+    @work
+    async def create_new_collection(self):
+        if self.app.collection is not None:
+            return None
+        collection = await self.app.push_screen_wait(NewCollectionScreen())
+        if collection is None:
+            return
+        msg = f"Created collection {collection.name}"
+        self.app.push_screen(MessageScreen(msg))
+        self.app.collection = collection
+        self.reload_sidebar(section_to_focus="collection")
 
     @work
     async def create_reading_list(self):
@@ -325,15 +346,3 @@ class PapMan(App):
             return
         success, res = self.app.library.load_entry_from_doi(doi)
         self.query_one(PapersModule).reload_papers()
-
-    @work
-    async def action_new_collection(self):
-        if self.collection is not None:
-            return None
-        collection = await self.app.push_screen_wait(NewCollectionScreen())
-        if collection is None:
-            return
-        msg = f"Created collection {collection.name}"
-        self.push_screen(MessageScreen(msg))
-        self.collection = collection
-        self.query_one(MainSidebar).reload_sidebar(section_to_focus="collection")
