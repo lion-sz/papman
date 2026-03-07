@@ -109,16 +109,16 @@ class PaperList(VimNavigableListView):
     @work
     async def action_attach(self):
         paper = self.highlighted_child.paper
-        if self.app.collection is None:
+        if self.app.active_collection is None:
             self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
             return
-        if paper.id in self.app.collection.papers:
+        if paper.id in self.app.active_collection.papers:
             self.app.push_screen(MessageScreen("Paper already attached", is_error=True))
             return
         key = await self.app.push_screen_wait(AttachPaperScreen(paper))
         if key is None:
             return
-        success, msg = self.app.collection.attach(paper, key)
+        success, msg = self.app.active_collection.attach(paper, key)
         if not success:
             self.app.push_screen(MessageScreen(msg))
         else:

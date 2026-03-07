@@ -43,7 +43,7 @@ class Library:
             print(f"Error parsing library.xml: {e}")
         self.reading_lists = ReadingLists(self.path)
 
-    def find_entry_by_id(self, entry_id: UUID) -> Entry | None:
+    def get_by_id(self, entry_id: UUID) -> Entry | None:
         """
         Find an entry by its ID.
 
@@ -82,7 +82,7 @@ class Library:
     def update_entry_from_bibtex(
         self, entry_id: UUID, bibtex_source: str
     ) -> tuple[bool, str]:
-        entry = self.find_entry_by_id(entry_id)
+        entry = self.get_by_id(entry_id)
         if entry is None:
             return False, f"Entry not found: {entry_id}"
 

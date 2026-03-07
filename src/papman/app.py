@@ -9,7 +9,83 @@ from .paper import PapersModule, SearchScreen, PaperList
 from .collection import CollectionPanel, NewCollectionScreen
 from .shared import MessageScreen, InputScreen, VimNavigableListView
 from .data.library import Library
-from .data.collection import Collection, load_collection
+from .data.collection import Collection, Collections
+
+
+class PapMan(App):
+    CSS_PATH = "css/app.tcss"
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("n", "navigation", "Toggle Nav"),
+        ("i", "import_entry", "Import"),
+        ("p", "focus_paper", "Focus Paper"),
+        ("/", "search", "Search"),
+    ]
+
+    config: Config
+    library: Library
+
+    collections: Collections
+    active_collection: Collection | None
+    active_reading_list_name: str | None
+
+    def __init__(self):
+        super().__init__()
+        self.config = load_config()
+        self.library = Library(self.config)
+        self.collections = Collections(self.library)
+        self.active_collection = None
+        self.active_reading_list_name = None
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        yield MainSidebar()
+        yield MainModule(id="main")
+
+        yield Footer()
+
+    def action_quit(self):
+        self.exit()
+
+    def action_navigation(self):
+        sidebar_list = self.query_one("#sidebar-list", SidebarList)
+        if sidebar_list.has_focus:
+            self._focus_main_panel()
+            return
+        if sidebar_list.index is None and len(sidebar_list.children) > 0:
+            sidebar_list.index = 0
+        sidebar_list.focus()
+
+    def action_focus_paper(self):
+        self.query_one(MainModule).content = "paper"
+        self._focus_main_panel()
+
+    def _focus_main_panel(self):
+        for paper_list in self.query(PaperList):
+            paper_list.focus()
+            return
+        self.query_one(MainModule).focus()
+
+    def action_search(self):
+        self.push_screen(SearchScreen())
+
+    @work
+    async def action_import_entry(self):
+        doi = await self.push_screen_wait(InputScreen("Import by DOI", "DOI"))
+        if doi is None:
+            return
+
+        msg = None
+        if len(doi) < 5 or len(doi) > 40:
+            msg = f"Doi length is not good: '{doi}'"
+        elif "/" not in doi:
+            msg = f"Doi does not contain a slash: '{doi}'"
+        if msg is not None:
+            await self.push_screen_wait(MessageScreen(msg, is_error=True))
+            return
+        success, res = self.app.library.load_entry_from_doi(doi)
+        self.query_one(PapersModule).reload_papers()
 
 
 class MainModule(Static):
@@ -70,19 +146,14 @@ class MainSidebar(Static):
             )
         )
         if self._expanded_sections["collection"]:
-            if self.app.collection is None:
-                rows.append(SidebarRowItem("  no collection loaded", "meta"))
-            else:
+            for name, collection in self.app.collections.collections.items():
+                n_paper = len(collection.papers)
                 rows.append(
                     SidebarRowItem(
-                        f"  name: {self.app.collection.name}",
-                        "meta",
-                    )
-                )
-                rows.append(
-                    SidebarRowItem(
-                        f"  papers: {len(self.app.collection.papers)}",
-                        "meta",
+                        f"  {name} ({n_paper})",
+                        payload=name,
+                        row_kind="collection",
+                        section=collection,
                     )
                 )
             rows.append(
@@ -216,24 +287,31 @@ class MainSidebar(Static):
                 item.section
             ]
             self.reload_sidebar(section_to_focus=item.section)
+        elif item.row_kind == "collection":
+            if (
+                self.app.active_collection is None
+                or self.app.active_collection.name != item.payload
+            ):
+                self.app.active_collection = self.app.collections.get(item.payload)
+            self.app.query_one(MainModule).content = "collection"
+        elif item.row_kind == "new_collection":
+            self.create_new_collection()
         elif item.row_kind == "reading_list" and item.payload is not None:
             self.app.active_reading_list_name = item.payload
             self.app.query_one(MainModule).content = "reading_list"
         elif item.row_kind == "new_reading_list":
             self.create_reading_list()
-        elif item.row_kind == "new_collection":
-            self.create_new_collection()
 
     @work
     async def create_new_collection(self):
-        if self.app.collection is not None:
-            return None
-        collection = await self.app.push_screen_wait(NewCollectionScreen())
+        collection = await self.app.push_screen_wait(
+            NewCollectionScreen(self.app.collections)
+        )
         if collection is None:
             return
         msg = f"Created collection {collection.name}"
         self.app.push_screen(MessageScreen(msg))
-        self.app.collection = collection
+        self.app.active_collection = collection
         self.reload_sidebar(section_to_focus="collection")
 
     @work
@@ -278,71 +356,3 @@ class ReadingListPanel(Static):
         for paper_list in paper_lists:
             paper_list.focus()
             break
-
-
-class PapMan(App):
-    CSS_PATH = "css/app.tcss"
-    BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("n", "navigation", "Toggle Nav"),
-        ("i", "import_entry", "Import"),
-        ("/", "search", "Search"),
-    ]
-
-    collection: Collection
-    library: Library
-    config: Config
-    active_reading_list_name: str | None
-
-    def __init__(self):
-        super().__init__()
-        self.config = load_config()
-        self.library = Library(self.config)
-        self.collection = load_collection(self.library.path)
-        self.active_reading_list_name = None
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-
-        yield MainSidebar()
-        yield MainModule(id="main")
-
-        yield Footer()
-
-    def action_quit(self):
-        self.exit()
-
-    def action_navigation(self):
-        sidebar_list = self.query_one("#sidebar-list", SidebarList)
-        if sidebar_list.has_focus:
-            self._focus_main_panel()
-            return
-        if sidebar_list.index is None and len(sidebar_list.children) > 0:
-            sidebar_list.index = 0
-        sidebar_list.focus()
-
-    def _focus_main_panel(self):
-        for paper_list in self.query(PaperList):
-            paper_list.focus()
-            return
-        self.query_one(MainModule).focus()
-
-    def action_search(self):
-        self.push_screen(SearchScreen())
-
-    @work
-    async def action_import_entry(self):
-        doi = await self.push_screen_wait(InputScreen("Import by DOI", "DOI"))
-        if doi is None:
-            return
-
-        msg = None
-        if len(doi) < 5 or len(doi) > 40:
-            msg = f"Doi length is not good: '{doi}'"
-        elif "/" not in doi:
-            msg = f"Doi does not contain a slash: '{doi}'"
-        if msg is not None:
-            await self.push_screen_wait(MessageScreen(msg, is_error=True))
-            return
-        success, res = self.app.library.load_entry_from_doi(doi)
-        self.query_one(PapersModule).reload_papers()

@@ -1,6 +1,3 @@
-from pathlib import Path
-import os
-
 from textual import on, work
 from textual.app import ComposeResult
 from textual.reactive import reactive
@@ -10,7 +7,7 @@ from textual.containers import Vertical
 
 from .shared import MessageScreen, ConfirmScreen
 
-from .data.collection import Collection
+from .data.collection import Collection, Collections
 from .paper import PaperList
 
 
@@ -37,12 +34,18 @@ class CollectionPanel(Static):
     paperlist: PaperList
 
     def compose(self) -> ComposeResult:
-        if self.app.collection is None:
+        lib = self.app.library
+        if self.app.active_collection is None:
             yield Static("No Collection loaded")
         else:
-            papers = [p[1] for i, p in self.app.collection.papers.items()]
-            keys = [p[0] for i, p in self.app.collection.papers.items()]
-            yield Static(f"Collection {self.app.collection.name}")
+            papers = []
+            keys = []
+            for paper_id, key in self.app.active_collection.papers.items():
+                entry = lib.get_by_id(paper_id)
+                assert entry is not None, f"Paper {paper_id} - {key} not found"
+                papers.append(entry)
+                keys.append(key)
+            yield Static(f"Collection {self.app.active_collection.name}")
             self.paperlist = PaperList(papers, keys)
             yield self.paperlist
 
@@ -83,8 +86,9 @@ class CollectionPanel(Static):
 class NewCollectionScreen(ModalScreen):
     BINDINGS = [("escape", "on_escape", "Close")]
 
-    def __init__(self):
+    def __init__(self, collections: Collections):
         super().__init__(classes="modal")
+        self.collections = collections
 
     def compose(self):
         with Vertical(classes="modal-content"):
@@ -94,10 +98,8 @@ class NewCollectionScreen(ModalScreen):
 
     @on(Input.Submitted, "#create_collection")
     def on_submit(self, event: Input.Submitted):
-        path = Path(os.getcwd()) / "collection.xml"
         name = self.query_one(Input).value
-        collection = Collection(path, name, {})
-        collection.save()
+        collection = self.collections.create(name)
         self.dismiss(collection)
 
     def action_on_escape(self):

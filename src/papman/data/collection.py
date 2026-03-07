@@ -1,86 +1,104 @@
-from uuid import UUID
 from pathlib import Path
+import atexit
+from uuid import UUID
 
 import xml.etree.ElementTree as ET
 
 from .entry import Entry
+from .library import Library
 
 
-def load_collection(library_path: Path):
-    """
-    Check the current working directory for a 'collection.xml' file.
-    If it exists, load it through the Collection class.
+class Collections:
+    FILE_NAME = "collection.xml"
 
-    Returns:
-        Collection | None: The loaded Collection object if the file exists, None otherwise.
-    """
-    collection_path = Path.cwd() / "collection.xml"
+    path: Path
+    library: Library
+    collections: dict[str, "Collection"]
 
-    if collection_path.exists():
-        return Collection.load(collection_path, library_path)
+    def __init__(self, library: Library):
+        self.library = library
+        self.path = library.path / self.FILE_NAME
+        self.collections = self._load_all()
+        atexit.register(self.save)
 
-    return None
+    def _load_all(self) -> dict[str, "Collection"]:
+        if not self.path.exists():
+            return {}
+
+        tree = ET.parse(self.path)
+        root = tree.getroot()
+        result = {}
+
+        if root.tag != "collections":
+            raise ValueError("Invalid collections file format.")
+
+        for collection_element in root.findall("collection"):
+            loaded = Collection.load_xml(collection_element)
+            if loaded is not None:
+                result[loaded.name] = loaded
+            else:
+                raise ValueError("Invalid collection format.")
+        if len(result) == 0:
+            raise ValueError("No collections found.")
+        return result
+
+    def save(self):
+        tree = ET.ElementTree(ET.Element("collections"))
+        root = tree.getroot()
+        for collection in self.collections.values():
+            root.append(collection._to_xml_element())
+        tree.write(self.path, encoding="utf-8", xml_declaration=True)
+
+    def get(self, name: str) -> "Collection | None":
+        return self.collections.get(name)
+
+    def create(self, name: str) -> "Collection":
+        collection = Collection(name, {})
+        self.collections[name] = collection
+        return collection
 
 
 class Collection:
-    path: Path
     name: str
-    papers: dict[UUID, tuple[str, Entry]]
+    papers: dict[UUID, str]
 
-    def __init__(self, path: Path, name: str, papers: dict[UUID, tuple[str, Entry]]):
-        self.path = path
+    def __init__(self, name: str, papers: dict[UUID, str]):
         self.name = name
         self.papers = papers
 
-    def save(self):
+    def _to_xml_element(self) -> ET.Element:
         root = ET.Element("collection", attrib={"name": self.name})
-
-        for uuid, (key, entry) in self.papers.items():
-            attrib = {
-                "id": str(uuid),
-                "key": key,
-            }
-            ET.SubElement(root, "entry", attrib=attrib)
-
-        tree = ET.ElementTree(root)
-        ET.indent(tree, space="  ")
-        tree.write(self.path, encoding="utf-8", xml_declaration=True)
+        for uuid, key in self.papers.items():
+            ET.SubElement(root, "entry", attrib={"id": str(uuid), "key": key})
+        return root
 
     @classmethod
-    def load(cls, file: Path, library_path: Path):
-        tree = ET.parse(file)
-        root = tree.getroot()
-
-        name = root.get("name")
+    def load_xml(cls, element: ET.Element):
+        name = element.get("name")
         papers = {}
 
-        for entry_element in root.findall("entry"):
+        for entry_element in element.findall("entry"):
             key = entry_element.get("key")
             entry_id = UUID(entry_element.get("id"))
+            papers[entry_id] = key
 
-            entry = Entry.load(library_path, entry_id)
-            papers[entry_id] = (key, entry)
-
-        return cls(Path(file), name, papers)
+        return cls(name, papers)
 
     def attach(self, paper: Entry, key: str) -> tuple[bool, str]:
-        if key in self.papers:
-            return False, f"Key '{key}' already exists."
-        new_id = paper.id
+        if paper.id in self.papers:
+            return False, f"Paper '{key}' already attached."
         exists = False
         for i, _ in self.papers.values():
-            if i == new_id:
+            if i == key:
                 exists = True
                 break
         if exists:
-            return False, "Paper already attached."
-        self.papers[paper.id] = (key, paper)
-        self.save()
+            return False, "Key already in use."
+        self.papers[paper.id] = key
         return True, ""
 
     def remove(self, paper_id: UUID) -> tuple[bool, str]:
         if paper_id not in self.papers:
             return False, "Paper is not in the collection."
         del self.papers[paper_id]
-        self.save()
         return True, ""
