@@ -145,6 +145,20 @@ class Library:
 
         return library_xml_path
 
+    def load_entry_from_bibtex(self, bibtex_source: str) -> tuple[bool, str]:
+        id = uuid4()
+        try:
+            entry = Entry.from_bibtex(bibtex_source, id=id, files=[])
+            entry.save_with_bibtex_source(self.path, bibtex_source)
+        except ValueError as e:
+            return False, str(e)
+        except OSError as e:
+            return False, f"Error saving entry '{id}': {str(e)}"
+
+        self.entries[id] = entry
+        self.populate()
+        return True, f"Entry saved with ID: {id}"
+
     def load_entry_from_doi(self, doi: str) -> tuple[bool, str]:
         # First check that this entry does not yet exist.
         if self.find_entry_by_doi(doi) is not None:

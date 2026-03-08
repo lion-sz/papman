@@ -56,6 +56,7 @@ class PaperList(VimNavigableListView):
     BINDINGS = [
         Binding("enter", "select_cursor", "Select"),
         Binding("a", "attach", "Attach Paper"),
+        Binding("c", "create", "Create Entry"),
         Binding("o", "open", "Open"),
         Binding("e", "edit", "Edit Metadata"),
     ]
@@ -94,6 +95,16 @@ class PaperList(VimNavigableListView):
             self.app.query_one("#main-sidebar").reload_sidebar(
                 section_to_focus="collection"
             )
+
+    @work
+    async def action_create(self):
+        draft = await self.app.push_screen_wait(EntryEditScreen(""))
+        if draft is None:
+            return
+        success, msg = self.app.library.load_entry_from_bibtex(draft)
+        self.app.push_screen(MessageScreen(msg, is_error=not success))
+        if success:
+            self.app.query_one(PapersModule).reload_papers()
 
     def action_open(self):
         paper = self.highlighted_child.paper
