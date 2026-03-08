@@ -19,7 +19,7 @@ from textual.widgets import (
 )
 from textual.containers import Horizontal, Vertical
 
-from .shared import MessageScreen, FilteredDirectoryTree, InputScreen
+from .shared import MessageScreen, FilePickerScreen, InputScreen
 from .shared import VimNavigableListView
 from .data.entry import Entry
 
@@ -52,37 +52,9 @@ class PaperListItem(ListItem):
             yield Label(tags_str, classes="paper-item-label paper-tags")
 
 
-class PapersModule(Static):
-    def compose(self) -> ComposeResult:
-        papers = list(self.app.library.entries.values())
-        with Vertical():
-            yield Static("Papers", classes="module-title")
-            yield PaperList(papers)
-
-    def on_mount(self):
-        self.query_one(PaperList).focus()
-
-    @work(exclusive=True)
-    async def reload_papers(self):
-        papers = list(self.app.library.entries.values())
-        new_list = PaperList(papers)
-        old_list = self.query_one(PaperList)
-        had_focus = old_list.has_focus
-        old_index = old_list.index
-
-        await old_list.remove()
-        await self.query_one(Vertical).mount(new_list)
-
-        if old_index is not None and len(new_list.children) > 0:
-            new_list.index = min(old_index, len(new_list.children) - 1)
-        if had_focus:
-            new_list.focus()
-
-
 class PaperList(VimNavigableListView):
     BINDINGS = [
         Binding("enter", "select_cursor", "Select"),
-        Binding("r", "refresh", "Refresh Library"),
         Binding("a", "attach", "Attach Paper"),
         Binding("o", "open", "Open"),
         Binding("e", "edit", "Edit Metadata"),
@@ -102,9 +74,6 @@ class PaperList(VimNavigableListView):
         if paper is None:
             raise ValueError("No paper selected")
         self.app.push_screen(PaperModal(paper))
-
-    def action_refresh(self):
-        self.app.library.populate()
 
     @work
     async def action_attach(self):
@@ -142,31 +111,34 @@ class PaperList(VimNavigableListView):
             success, msg = self.app.library.update_entry_from_bibtex(paper.id, draft)
             self.app.push_screen(MessageScreen(msg, is_error=not success))
             if success:
-                self.app.query_one(PapersModule).reload_papers()
+                self.recompose()
 
 
-class FilePickerScreen(ModalScreen):
-    BINDINGS = [
-        ("escape", "app.pop_screen", "Cancel"),
-        ("enter", "select_file", "Select"),
-    ]
+class PapersModule(Static):
+    def compose(self) -> ComposeResult:
+        papers = list(self.app.library.entries.values())
+        with Vertical():
+            yield Static("Papers", classes="module-title")
+            yield PaperList(papers)
 
-    def __init__(self):
-        super().__init__(classes="modal")
-        self.selected_file = None
+    def on_mount(self):
+        self.query_one(PaperList).focus()
 
-    def compose(self):
-        with Vertical(classes="modal-content"):
-            yield Static("Select a file", classes="module-title")
-            yield FilteredDirectoryTree("~", id="file-tree")
-        yield Footer()
+    @work(exclusive=True)
+    async def reload_papers(self):
+        papers = list(self.app.library.entries.values())
+        new_list = PaperList(papers)
+        old_list = self.query_one(PaperList)
+        had_focus = old_list.has_focus
+        old_index = old_list.index
 
-    @on(FilteredDirectoryTree.FileChosen)
-    def on_file_chosen(self, event: FilteredDirectoryTree.FileChosen) -> None:
-        self.selected_file = event.path
-        path = event.path
-        self.log(f"Selected file: {path} ({type(path)})")
-        self.dismiss(path)
+        await old_list.remove()
+        await self.query_one(Vertical).mount(new_list)
+
+        if old_index is not None and len(new_list.children) > 0:
+            new_list.index = min(old_index, len(new_list.children) - 1)
+        if had_focus:
+            new_list.focus()
 
 
 class PaperModal(ModalScreen):
@@ -221,7 +193,9 @@ class PaperModal(ModalScreen):
 
     @work
     async def action_attach(self):
-        path = await self.app.push_screen_wait(FilePickerScreen())
+        path = await self.app.push_screen_wait(FilePickerScreen(file_types=[".pdf"]))
+        if path is None:
+            return
         success, msg = self.paper.attach(path, self.app.library.path)
         if not success:
             self.app.push_screen(MessageScreen(msg))

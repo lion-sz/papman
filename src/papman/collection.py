@@ -8,7 +8,7 @@ from textual.containers import Vertical
 from .shared import MessageScreen, ConfirmScreen
 
 from .data.collection import Collection, Collections
-from .paper import PaperList
+from .paper import PaperList, FilePickerScreen
 
 
 class CollectionSidebar(Static):
@@ -30,6 +30,7 @@ class CollectionSidebar(Static):
 class CollectionPanel(Static):
     BINDINGS = [
         ("d", "remove_paper", "Remove"),
+        ("b", "bibtex_export", "BibTeX Export"),
     ]
     paperlist: PaperList
 
@@ -81,6 +82,35 @@ class CollectionPanel(Static):
             section_to_focus="collection"
         )
         self.app.query_one("CollectionPanel").refresh(recompose=True)
+
+    @work
+    async def action_bibtex_export(self):
+        if self.app.active_collection is None:
+            self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
+            return
+
+        screen = FilePickerScreen(allow_file_creation=True, file_types=[".bib"])
+        export_path = await self.app.push_screen_wait(screen)
+        if export_path is None:
+            return
+
+        lib = self.app.library
+        bib_contents = []
+        for paper_id in self.app.active_collection.papers:
+            bib_source = lib.get_entry_bibtex_source(paper_id)
+            if bib_source:
+                bib_contents.append(bib_source.strip())
+
+        try:
+            export_path.write_text("\n\n".join(bib_contents), encoding="utf-8")
+            self.app.push_screen(
+                MessageScreen(
+                    f"Exported {len(bib_contents)} entries to {export_path.name}",
+                    is_error=False,
+                )
+            )
+        except OSError as e:
+            self.app.push_screen(MessageScreen(f"Export failed: {e}", is_error=True))
 
 
 class NewCollectionScreen(ModalScreen):

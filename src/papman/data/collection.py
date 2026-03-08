@@ -87,12 +87,7 @@ class Collection:
     def attach(self, paper: Entry, key: str) -> tuple[bool, str]:
         if paper.id in self.papers:
             return False, f"Paper '{key}' already attached."
-        exists = False
-        for i, _ in self.papers.values():
-            if i == key:
-                exists = True
-                break
-        if exists:
+        if key in self.papers.values():
             return False, "Key already in use."
         self.papers[paper.id] = key
         return True, ""
@@ -101,4 +96,16 @@ class Collection:
         if paper_id not in self.papers:
             return False, "Paper is not in the collection."
         del self.papers[paper_id]
+        return True, ""
+
+    def export(self, library: Library, output_path: Path) -> tuple[bool, str]:
+        parts = []
+        for paper_id in self.papers:
+            bib = library.get_entry_bibtex_source(paper_id)
+            if bib:
+                parts.append(bib)
+        try:
+            output_path.write_text("\n".join(parts), encoding="utf-8")
+        except OSError as e:
+            return False, f"Error writing export file: {str(e)}"
         return True, ""

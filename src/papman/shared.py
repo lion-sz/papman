@@ -6,7 +6,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Static, Button, Input, DirectoryTree, Footer, ListView
 from textual.app import Binding, ComposeResult
 from textual.message import Message
-from textual import on
+from textual import on, work
 
 
 class VimNavigableListView(ListView):
@@ -104,6 +104,8 @@ class ConfirmScreen(ModalScreen):
 
 
 class FilteredDirectoryTree(DirectoryTree):
+    file_types: list[str] | None
+
     class FileChosen(Message):
         bubble: bool = True
 
@@ -119,8 +121,15 @@ class FilteredDirectoryTree(DirectoryTree):
         Binding("k", "cursor_up", "Up"),
     ]
 
+    def __init__(self, path: str, file_types: list[str] | None = None, **kwargs):
+        super().__init__(path, **kwargs)
+        self.file_types = file_types
+
     def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
-        return [path for path in paths if not path.name.startswith(".")]
+        p = [path for path in paths if not path.name.startswith(".")]
+        if self.file_types is not None:
+            p = [path for path in p if path.suffix in self.file_types or path.is_dir()]
+        return p
 
     def action_select_cursor(self):
         node = self.cursor_node
@@ -130,3 +139,76 @@ class FilteredDirectoryTree(DirectoryTree):
             msg = self.FileChosen(self, node.data.path)
             self.post_message(msg)
         return
+
+
+class FilePickerScreen(ModalScreen):
+    BINDINGS = [
+        ("enter", "select_file", "Select"),
+        ("n", "create_new_file", "New File"),
+        ("escape", "quit", "Quit"),
+    ]
+
+    allow_file_creation: bool
+    file_types: list[str] | None
+
+    def __init__(self, allow_file_creation: bool = False, file_types: list[str] = None):
+        super().__init__(classes="modal")
+        self.selected_file = None
+        self.allow_file_creation = allow_file_creation
+        self.file_types = file_types
+
+    def compose(self):
+        with Vertical(classes="modal-content"):
+            yield Static("Select a file", classes="module-title")
+            yield FilteredDirectoryTree("~", id="file-tree", file_types=self.file_types)
+        yield Footer()
+
+    @on(FilteredDirectoryTree.FileChosen)
+    def on_file_chosen(self, event: FilteredDirectoryTree.FileChosen) -> None:
+        self.selected_file = event.path
+        path = event.path
+        self.log(f"Selected file: {path} ({type(path)})")
+        self.dismiss(path)
+
+    @work
+    async def action_create_new_file(self):
+        if not self.allow_file_creation:
+            return
+        """Create a new empty file in the current directory."""
+        tree = self.query_one("#file-tree", FilteredDirectoryTree)
+
+        # Get the path at the current cursor location
+        cursor_node = tree.cursor_node
+        if cursor_node is None:
+            current_dir = tree.path
+        else:
+            cursor_path = cursor_node.data.path
+            # If cursor is on a file, use its parent directory
+            current_dir = cursor_path if cursor_path.is_dir() else cursor_path.parent
+
+        # Get filename from user
+        filename = await self.app.push_screen_wait(InputScreen("Enter filename"))
+        if filename is None or not filename.strip():
+            return
+
+        filename = filename.strip()
+        new_file_path = Path(current_dir) / filename
+
+        # Check if file already exists
+        if new_file_path.exists():
+            self.app.push_screen(
+                MessageScreen(f"File already exists: {filename}", is_error=True)
+            )
+            return
+
+        # Create the empty file
+        try:
+            new_file_path.touch()
+            self.dismiss(new_file_path)
+        except OSError as e:
+            self.app.push_screen(
+                MessageScreen(f"Could not create file: {str(e)}", is_error=True)
+            )
+
+    def action_quit(self):
+        self.dismiss(None)
