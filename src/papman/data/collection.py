@@ -38,8 +38,6 @@ class Collections:
                 result[loaded.name] = loaded
             else:
                 raise ValueError("Invalid collection format.")
-        if len(result) == 0:
-            raise ValueError("No collections found.")
         return result
 
     def save(self):
