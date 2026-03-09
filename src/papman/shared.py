@@ -105,6 +105,7 @@ class ConfirmScreen(ModalScreen):
 
 class FilteredDirectoryTree(DirectoryTree):
     file_types: list[str] | None
+    search_term: str = ""
 
     class FileChosen(Message):
         bubble: bool = True
@@ -129,6 +130,12 @@ class FilteredDirectoryTree(DirectoryTree):
         p = [path for path in paths if not path.name.startswith(".")]
         if self.file_types is not None:
             p = [path for path in p if path.suffix in self.file_types or path.is_dir()]
+        if self.search_term:
+            p = [
+                path
+                for path in p
+                if self.search_term.lower() in path.name.lower() or path.is_dir()
+            ]
         return p
 
     def action_select_cursor(self):
@@ -140,11 +147,44 @@ class FilteredDirectoryTree(DirectoryTree):
             self.post_message(msg)
         return
 
+    def select_path(self, path: Path) -> None:
+        """Select the node for the given path, or its nearest visible ancestor."""
+        if not self.root:
+            return
+
+        target_path = path.expanduser().absolute()
+        best_node = self.root
+
+        # Helper to walk all loaded nodes
+        def walk_tree(node):
+            yield node
+            for child in node.children:
+                yield from walk_tree(child)
+
+        # Walk all loaded nodes to find the best match
+        for node in walk_tree(self.root):
+            if node.data:
+                try:
+                    node_path = node.data.path.expanduser().absolute()
+                    # If this node is the target or a parent of the target
+                    if target_path == node_path or node_path in target_path.parents:
+                        # We want the deepest match
+                        if not best_node.data or len(node_path.parts) > len(
+                            best_node.data.path.parts
+                        ):
+                            best_node = node
+                except (ValueError, AttributeError):
+                    continue
+
+        self.move_cursor(best_node)
+        self.scroll_to_node(best_node)
+
 
 class FilePickerScreen(ModalScreen):
     BINDINGS = [
         ("enter", "select_file", "Select"),
         ("n", "create_new_file", "New File"),
+        ("slash", "show_search", "Search"),
         ("escape", "quit", "Quit"),
     ]
 
@@ -156,11 +196,18 @@ class FilePickerScreen(ModalScreen):
         self.selected_file = None
         self.allow_file_creation = allow_file_creation
         self.file_types = file_types
+        self.initial_path = None  # Store path before search
+        self._search_timer = None
 
     def compose(self):
         with Vertical(classes="modal-content"):
             yield Static("Select a file", classes="module-title")
             yield FilteredDirectoryTree("~", id="file-tree", file_types=self.file_types)
+            search_input = Input(
+                placeholder="Search...", id="search-input", classes="search-bar"
+            )
+            search_input.display = False
+            yield search_input
         yield Footer()
 
     @on(FilteredDirectoryTree.FileChosen)
@@ -210,5 +257,47 @@ class FilePickerScreen(ModalScreen):
                 MessageScreen(f"Could not create file: {str(e)}", is_error=True)
             )
 
+    def action_show_search(self):
+        tree = self.query_one("#file-tree", FilteredDirectoryTree)
+        search_input = self.query_one("#search-input", Input)
+
+        # Store current position if we're not already searching
+        if not search_input.display and tree.cursor_node and tree.cursor_node.data:
+            self.initial_path = tree.cursor_node.data.path
+
+        search_input.display = True
+        search_input.focus()
+
+    @on(Input.Changed, "#search-input")
+    def on_search_changed(self, event: Input.Changed):
+        if self._search_timer is not None:
+            self._search_timer.stop()
+        self._search_timer = self.set_timer(0.2, lambda: self._run_search(event.value))
+
+    @work(exclusive=True)
+    async def _run_search(self, value: str):
+        tree = self.query_one("#file-tree", FilteredDirectoryTree)
+        tree.search_term = value
+        tree.reload()
+
+    @on(Input.Submitted, "#search-input")
+    def on_search_submitted(self):
+        tree = self.query_one("#file-tree", FilteredDirectoryTree)
+        tree.focus()
+        self.query_one("#search-input", Input).display = False
+        if self.initial_path:
+            tree.select_path(self.initial_path)
+
     def action_quit(self):
+        search_input = self.query_one("#search-input", Input)
+        if search_input.display:
+            search_input.display = False
+            search_input.value = ""
+            tree = self.query_one("#file-tree", FilteredDirectoryTree)
+            tree.search_term = ""
+            tree.reload()
+            tree.focus()
+            if self.initial_path:
+                self.call_after_refresh(tree.select_path, self.initial_path)
+            return
         self.dismiss(None)
