@@ -129,11 +129,11 @@ class PapersModule(Static):
     def compose(self) -> ComposeResult:
         papers = list(self.app.library.entries.values())
         with Vertical():
-            yield Static("Papers", classes="module-title")
-            yield PaperList(papers)
+            # yield Static("Papers", classes="module-title")
+            yield PaperList(papers, id="paper_list")
 
     def on_mount(self):
-        self.query_one(PaperList).focus()
+        self.query_one("#paper_list").focus()
 
     @work(exclusive=True)
     async def reload_papers(self):

@@ -1,19 +1,122 @@
 from pathlib import Path
 from typing import Iterable
 
+from textual import events
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Input, DirectoryTree, Footer, ListView
+from textual.widgets import (
+    Static,
+    Button,
+    Input,
+    DirectoryTree,
+    Footer,
+    ListView,
+    ListItem,
+)
 from textual.app import Binding, ComposeResult
 from textual.message import Message
+from textual.reactive import reactive
+from textual.widget import Widget
 from textual import on, work
 
 
-class VimNavigableListView(ListView):
-    BINDINGS = [
-        Binding("j", "cursor_down", "Down", show=False),
-        Binding("k", "cursor_up", "Up", show=False),
-    ]
+class CommandLine(Widget):
+    DEFAULT_CSS = """
+    CommandLine {
+        dock: bottom;
+        height: 1;
+        width: 100%;
+    }
+    """
+
+    command = reactive("")
+
+    def render(self):
+        return self.command
+
+
+class VimNavigableListView(Static):
+    command: str
+    KNOWN_COMMANDS = ["j", "k", "escape"]
+    elems: list[ListItem]
+
+    def __init__(self, *children, **kwargs):
+        super().__init__(**kwargs)
+        self.elems = children
+        self.command = ""
+
+    @property
+    def index(self):
+        return self.query_one(ListView).index
+
+    @index.setter
+    def index(self, value: int):
+        self.query_one(ListView).index = value
+
+    def focus(self):
+        self.query_one(ListView).focus()
+
+    @property
+    def highlighted_child(self):
+        return self.query_one(ListView).highlighted_child
+
+    def compose(self):
+        yield ListView(*self.elems, id=self.id, classes="box")
+        command = CommandLine()
+        command.display = False
+        yield command
+
+    async def _on_key(self, event: events.Key) -> None:
+        handled = await self.handle_key(event)
+        if not handled and not self._is_bound_in_active_chain(event):
+            await self.on_unbound_key(event)
+
+    def _is_bound_in_active_chain(self, event: events.Key) -> bool:
+        try:
+            binding_chain = self.screen._modal_binding_chain
+        except Exception:
+            return False
+
+        for key in event.aliases:
+            if any(key in bindings.key_to_bindings for _, bindings in binding_chain):
+                return True
+
+        return False
+
+    async def on_unbound_key(self, event: events.Key) -> None:
+        """Hook for keys that don't resolve to a binding on this list view."""
+        cl = self.query_one(CommandLine)
+        if event.key not in self.KNOWN_COMMANDS:
+            self.command = self.command + event.key
+            cl.command = self.command
+            if not cl.display:
+                cl.display = True
+            return
+        # Try parsing the modifier
+        if self.command is not None and self.command.isnumeric():
+            modifier = int(self.command)
+        else:
+            modifier = 1
+        self.command = ""
+        cl.command = ""
+        cl.display = False
+
+        if event.key in ("j", "k"):
+            self.move(modifier, event.key == "k")
+        if event.key == "escape":
+            pass
+        return
+
+    def move(self, steps: int, up: bool):
+        list = self.query_one(ListView)
+        ind = list.index
+        n_items = len(list.children)
+        if up:
+            steps = -steps
+        new_ind = ind + steps
+        new_ind = max(0, min(new_ind, n_items - 1))
+        list.index = new_ind
+        return
 
 
 class MessageScreen(ModalScreen):
