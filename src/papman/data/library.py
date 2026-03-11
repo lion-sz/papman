@@ -194,3 +194,41 @@ class Library:
         self.entries[id] = entry
         self.populate()
         return True, f"Entry saved with ID: {id}"
+
+
+def search_papers(papers: list[Entry], query: str) -> list[bool]:
+
+    q = query.strip().lower()
+    if not q:
+        return papers
+
+    tokens = query.strip().split()
+    tag_terms: list[str] = []
+    text_tokens: list[str] = []
+    for token in tokens:
+        if len(token) >= 3 and token.startswith("<") and token.endswith(">"):
+            tag = token[1:-1].strip().lower()
+            if tag:
+                tag_terms.append(tag)
+                continue
+        text_tokens.append(token.lower())
+    text_query = " ".join(text_tokens).strip()
+
+    def matches(paper):
+        paper_tags = {tag.lower() for tag in getattr(paper, "tags", [])}
+        if any(tag not in paper_tags for tag in tag_terms):
+            return False
+        if not text_query:
+            return True
+
+        haystack = [
+            paper.title or "",
+            paper.author_str,
+            getattr(paper, "journal", None) or "",
+            getattr(paper, "key", "") or "",
+        ]
+        text = " ".join(haystack).lower()
+        return text_query in text
+
+    filtered = [paper for paper in papers if matches(paper)]
+    return filtered

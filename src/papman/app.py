@@ -5,7 +5,7 @@ from textual.widgets import Footer, Header, Static, ListView, ListItem, Label
 from textual.containers import Vertical
 
 from .config import Config, load_config
-from .paper import PapersModule, SearchScreen, PaperList
+from .paper import PapersModule, PaperList
 from .collection import CollectionPanel, NewCollectionScreen
 from .shared import MessageScreen, InputScreen, VimNavigableListView
 from .data.library import Library
@@ -19,7 +19,6 @@ class PapMan(App):
         ("n", "navigation", "Toggle Nav"),
         ("i", "import_entry", "Import"),
         ("p", "focus_paper", "Focus Paper"),
-        ("/", "search", "Search"),
     ]
 
     config: Config
@@ -66,9 +65,6 @@ class PapMan(App):
             paper_list.focus()
             return
         self.query_one(MainModule).focus()
-
-    def action_search(self):
-        self.push_screen(SearchScreen())
 
     @work
     async def action_import_entry(self):

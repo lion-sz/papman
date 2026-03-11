@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterable
 
-from textual import events
+from textual import events, on, work
 from textual.containers import Vertical, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import (
@@ -17,7 +17,7 @@ from textual.app import Binding, ComposeResult
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual import on, work
+from textual.timer import Timer
 
 
 class CommandLine(Widget):
@@ -37,13 +37,24 @@ class CommandLine(Widget):
 
 class VimNavigableListView(Static):
     command: str
-    KNOWN_COMMANDS = ["j", "k", "escape"]
     elems: list[ListItem]
+
+    KNOWN_COMMANDS = ["j", "k", "escape"]
+    searchable: bool = False
+
+    _search_mode: bool
+    _search_timer: Timer | None
+    _before_search_index: int | None
+    _is_filtered: bool
 
     def __init__(self, *children, **kwargs):
         super().__init__(**kwargs)
         self.elems = children
         self.command = ""
+        self._search_mode = False
+        self._search_timer = None
+        self._before_search_index = None
+        self._is_filtered = False
 
     @property
     def index(self):
@@ -66,7 +77,74 @@ class VimNavigableListView(Static):
         command.display = False
         yield command
 
+    def run_search(self, query: str) -> list[ListItem]:
+        self.app.push_screen(MessageScreen(f"Searching for '{str}'"))
+        return
+
+    @work(exclusive=True)
+    async def _run_search(self, query: str):
+        filtered = self.run_search(query)
+        list = self.query_one(ListView)
+        list.clear()
+        list.extend(filtered)
+        list.focus()
+        list.index = 0
+        return
+
+    def _reset_search(self):
+        list = self.query_one(ListView)
+        list.clear()
+        list.extend(self.elems)
+        list.focus()
+        list.index = self._before_search_index
+
     async def _on_key(self, event: events.Key) -> None:
+        cl = self.query_one(CommandLine)
+
+        if event.key == "escape":
+            event.stop()
+            if self._is_filtered:
+                self._search_mode = False
+                self._is_filtered = False
+                self._search_timer = None
+                self._reset_search()
+            self.command = ""
+            cl.command = ""
+            cl.display = False
+            return
+
+        if self._search_mode:
+            event.stop()
+            if self._search_timer is not None:
+                self._search_timer.stop()
+            if event.key == "enter":
+                self._search_mode = False
+                self._search_timer = None
+                self._run_search(self.command)
+            else:
+                if event.key == "backspace":
+                    self.command = self.command[:-1] if self.command else self.command
+                else:
+                    self.command = (
+                        self.command + event.character
+                        if event.character
+                        else self.command
+                    )
+                cl.command = "/" + self.command
+                self._search_timer = self.set_timer(
+                    0.2, lambda: self._run_search(self.command)
+                )
+            return
+        if self.searchable and event.key == "slash":
+            event.stop()
+            self._before_search_index = self.index
+            self._is_filtered = True
+            self._search_mode = True
+            self.command = ""
+            cl.command = "/"
+            cl.display = True
+            return
+
         handled = await self.handle_key(event)
         if not handled and not self._is_bound_in_active_chain(event):
             await self.on_unbound_key(event)
@@ -87,7 +165,10 @@ class VimNavigableListView(Static):
         """Hook for keys that don't resolve to a binding on this list view."""
         cl = self.query_one(CommandLine)
         if event.key not in self.KNOWN_COMMANDS:
-            self.command = self.command + event.key
+            if event.key == "backspace":
+                self.command = self.command[:-1] if self.command else self.command
+            else:
+                self.command = self.command + event.key
             cl.command = self.command
             if not cl.display:
                 cl.display = True

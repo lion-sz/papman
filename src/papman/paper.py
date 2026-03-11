@@ -5,7 +5,6 @@ from tempfile import NamedTemporaryFile
 from textual import on, work
 from textual.app import ComposeResult, Binding
 from textual.screen import ModalScreen
-from textual.timer import Timer
 from textual.widgets import (
     Static,
     Input,
@@ -22,6 +21,7 @@ from textual.containers import Horizontal, Vertical
 from .shared import MessageScreen, FilePickerScreen, InputScreen
 from .shared import VimNavigableListView
 from .data.entry import Entry
+from .data.library import search_papers
 
 
 class PaperListItem(ListItem):
@@ -54,14 +54,16 @@ class PaperListItem(ListItem):
 
 class PaperList(VimNavigableListView):
     BINDINGS = [
-        Binding("enter", "select_cursor", "Select"),
         Binding("a", "attach", "Attach Paper"),
         Binding("c", "create", "Create Entry"),
         Binding("o", "open", "Open"),
         Binding("e", "edit", "Edit Metadata"),
     ]
+    papers: list[Entry]
+    searchable: bool = True
 
     def __init__(self, papers: list[Entry], keys: list[str] = None, id=None):
+        self.papers = papers
         items = []
         for i, p in enumerate(papers):
             if keys is not None:
@@ -70,7 +72,13 @@ class PaperList(VimNavigableListView):
                 items.append(PaperListItem(p))
         super().__init__(*items, id=id)
 
-    def action_select_cursor(self):
+    def run_search(self, query: str) -> list[PaperListItem]:
+        filtered = search_papers(self.papers, query)
+        elements = [PaperListItem(p) for p in filtered]
+        return elements
+
+    @on(ListView.Selected)
+    def paper_details(self, event: ListView.Selected) -> None:
         paper = self.highlighted_child.paper
         if paper is None:
             raise ValueError("No paper selected")
@@ -422,92 +430,3 @@ class EntryEditScreen(ModalScreen):
     @on(Button.Pressed, "#entry-edit-done")
     def on_done_pressed(self):
         self.dismiss(self._collect_draft())
-
-
-class SearchScreen(ModalScreen):
-    BINDINGS = [
-        Binding("escape", "close", "Close"),
-    ]
-
-    def __init__(self):
-        super().__init__(classes="modal")
-        self._search_timer: Timer | None = None
-
-    def compose(self):
-        with Vertical(id="search-modal", classes="modal-content"):
-            yield PaperList([], id="search-results")
-            yield Input(placeholder="Type to search... use <tag>", id="search-query")
-        yield Footer()
-
-    def on_mount(self):
-        self.query_one("#search-query", Input).focus()
-
-    def action_close(self):
-        self.dismiss(None)
-
-    @on(Input.Changed, "#search-query")
-    def on_search_input_changed(self, event: Input.Changed):
-        if self._search_timer is not None:
-            self._search_timer.stop()
-        self._search_timer = self.set_timer(0.2, lambda: self._run_search(event.value))
-
-    @on(Input.Submitted, "#search-query")
-    def on_search_input_submitted(self, _: Input.Submitted):
-        results = self.query_one("#search-results", PaperList)
-        if len(results.children) == 0:
-            return
-        if results.index is None:
-            results.index = 0
-        results.focus()
-
-    @work(exclusive=True)
-    async def _run_search(self, query: str):
-        # Placeholder for future, real search backend integration.
-        papers = self._search_papers(query)
-        results = self.query_one("#search-results", PaperList)
-        had_focus = results.has_focus
-        old_index = results.index
-        results.clear()
-        for paper in papers:
-            results.append(PaperListItem(paper))
-
-        if old_index is not None and len(results.children) > 0:
-            results.index = min(old_index, len(results.children) - 1)
-        if had_focus:
-            results.focus()
-
-    def _search_papers(self, query: str):
-        papers = list(self.app.library.entries.values())
-        q = query.strip().lower()
-        if not q:
-            return papers
-
-        tokens = query.strip().split()
-        tag_terms: list[str] = []
-        text_tokens: list[str] = []
-        for token in tokens:
-            if len(token) >= 3 and token.startswith("<") and token.endswith(">"):
-                tag = token[1:-1].strip().lower()
-                if tag:
-                    tag_terms.append(tag)
-                    continue
-            text_tokens.append(token.lower())
-        text_query = " ".join(text_tokens).strip()
-
-        def matches(paper):
-            paper_tags = {tag.lower() for tag in getattr(paper, "tags", [])}
-            if any(tag not in paper_tags for tag in tag_terms):
-                return False
-            if not text_query:
-                return True
-
-            haystack = [
-                paper.title or "",
-                paper.author_str,
-                getattr(paper, "journal", None) or "",
-                getattr(paper, "key", "") or "",
-            ]
-            text = " ".join(haystack).lower()
-            return text_query in text
-
-        return [paper for paper in papers if matches(paper)]
