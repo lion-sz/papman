@@ -2,8 +2,6 @@ from textual import work, on
 from textual.reactive import reactive
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, ListView, ListItem, Label
-from textual.containers import Vertical
-
 from .config import Config, load_config
 from .paper import PapersModule, PaperList
 from .collection import CollectionPanel, NewCollectionScreen
@@ -342,12 +340,11 @@ class ReadingListPanel(Static):
             if entry is not None:
                 papers.append(entry)
 
-        with Vertical():
-            yield Static(f"Reading List: {list_name}", classes="module-title")
-            if len(papers) == 0:
-                yield Static("No papers in this reading list")
-            else:
-                yield PaperList(papers)
+        yield Static(f"Reading List: {list_name}", classes="module-title")
+        if len(papers) == 0:
+            yield Static("No papers in this reading list")
+        else:
+            yield PaperList(papers)
 
     def on_mount(self):
         paper_lists = self.query(PaperList)

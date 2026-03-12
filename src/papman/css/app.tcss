@@ -6,7 +6,7 @@ Screen {
 
 #main-sidebar {
     layout: vertical;
-    height: 100%;
+    height: 1fr;
     background: $primary-background;
     border-right: $primary;
     padding: 0 1;
@@ -22,7 +22,18 @@ Screen {
 }
 
 #main {
-    height: 100%;
+    height: 1fr;
+}
+
+PapersModule,
+CollectionPanel,
+ReadingListPanel {
+    layout: vertical;
+    height: 1fr;
+}
+
+VimNavigableListView {
+    height: 1fr;
 }
 
 .paper-item{

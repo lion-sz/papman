@@ -149,9 +149,7 @@ class PaperList(VimNavigableListView):
 class PapersModule(Static):
     def compose(self) -> ComposeResult:
         papers = list(self.app.library.entries.values())
-        with Vertical():
-            # yield Static("Papers", classes="module-title")
-            yield PaperList(papers, id="paper_list")
+        yield PaperList(papers, id="paper_list")
 
     def on_mount(self):
         self.query_one("#paper_list").focus()
@@ -165,7 +163,7 @@ class PapersModule(Static):
         old_index = old_list.index
 
         await old_list.remove()
-        await self.query_one(Vertical).mount(new_list)
+        await self.mount(new_list)
 
         if old_index is not None and len(new_list.children) > 0:
             new_list.index = min(old_index, len(new_list.children) - 1)
