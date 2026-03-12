@@ -159,14 +159,14 @@ class PapersModule(Static):
         papers = list(self.app.library.entries.values())
         new_list = PaperList(papers)
         old_list = self.query_one(PaperList)
-        had_focus = old_list.has_focus
+        had_focus = old_list.has_focus or old_list.query_one(ListView).has_focus
         old_index = old_list.index
 
         await old_list.remove()
         await self.mount(new_list)
 
-        if old_index is not None and len(new_list.children) > 0:
-            new_list.index = min(old_index, len(new_list.children) - 1)
+        if old_index is not None and len(papers) > 0:
+            new_list.index = min(old_index, len(papers) - 1)
         if had_focus:
             new_list.focus()
 

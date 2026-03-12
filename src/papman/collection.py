@@ -50,6 +50,9 @@ class CollectionPanel(Static):
             self.paperlist = PaperList(papers, keys)
             yield self.paperlist
 
+    def focus(self):
+        self.paperlist.focus()
+
     def on_mount(self):
         self.query_one(PaperList).focus()
 

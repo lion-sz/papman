@@ -66,7 +66,10 @@ class VimNavigableListView(Static):
         self.query_one(ListView).index = value
 
     def focus(self):
-        self.query_one(ListView).focus()
+        list_view = self.query_one(ListView)
+        if list_view.index is None and len(list_view.children) > 0:
+            list_view.index = 0
+        return list_view.focus()
 
     @property
     def highlighted_child(self):
@@ -86,22 +89,22 @@ class VimNavigableListView(Static):
     async def _run_search(self, query: str):
         filtered = self.run_search(query)
         list = self.query_one(ListView)
-        list.clear()
+        await list.clear()
         if len(filtered) > 0:
-            list.extend(filtered)
-            list.focus()
+            await list.extend(filtered)
             list.index = 0
+            list.focus()
         else:
             # Keep key handling on the container active when the list has no rows.
             super().focus()
         return
 
-    def _reset_search(self):
+    async def _reset_search(self):
         list = self.query_one(ListView)
-        list.clear()
-        list.extend(self.elems)
-        list.focus()
+        await list.clear()
+        await list.extend(self.elems)
         list.index = self._before_search_index
+        list.focus()
 
     async def _on_key(self, event: events.Key) -> None:
         cl = self.query_one(CommandLine)
@@ -114,7 +117,7 @@ class VimNavigableListView(Static):
                 if self._search_timer is not None:
                     self._search_timer.stop()
                     self._search_timer = None
-                self._reset_search()
+                await self._reset_search()
             self.command = ""
             cl.command = ""
             cl.display = False

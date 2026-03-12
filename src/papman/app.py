@@ -47,7 +47,7 @@ class PapMan(App):
 
     def action_navigation(self):
         sidebar_list = self.query_one("#sidebar-list", SidebarList)
-        if sidebar_list.has_focus:
+        if sidebar_list.has_focus_within:
             self._focus_main_panel()
             return
         if sidebar_list.index is None and len(sidebar_list.children) > 0:
@@ -59,9 +59,10 @@ class PapMan(App):
         self._focus_main_panel()
 
     def _focus_main_panel(self):
-        for paper_list in self.query(PaperList):
-            paper_list.focus()
-            return
+        # self.app.push_screen(MessageScreen("Focus main panel"))
+        # for paper_list in self.query(PaperList):
+        #     paper_list.focus()
+        #     return
         self.query_one(MainModule).focus()
 
     @work
@@ -92,6 +93,14 @@ class MainModule(Static):
             yield ReadingListPanel()
         else:
             yield CollectionPanel()
+
+    def focus(self):
+        if self.content == "paper":
+            self.query_one(PaperList).focus()
+        elif self.content == "reading_list":
+            self.query_one(ReadingListPanel).focus()
+        else:
+            self.query_one(CollectionPanel).focus()
 
 
 class SidebarRowItem(ListItem):
@@ -247,13 +256,13 @@ class MainSidebar(Static):
     async def reload_sidebar(self, section_to_focus: str | None = None):
         sidebar_list = self.query_one(SidebarList)
         list_view = sidebar_list.query_one(ListView)
-        had_focus = list_view.has_focus
+        had_focus = list_view.has_focus or sidebar_list.has_focus
         old_index = sidebar_list.index
         rows = self._build_rows()
 
         sidebar_list.elems = rows
-        list_view.clear()
-        list_view.extend(rows)
+        await list_view.clear()
+        await list_view.extend(rows)
 
         if len(rows) > 0:
             if section_to_focus is None:
