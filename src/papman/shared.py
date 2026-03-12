@@ -36,6 +36,7 @@ class CommandLine(Widget):
 
 
 class VimNavigableListView(Static):
+    can_focus = True
     command: str
     elems: list[ListItem]
 
@@ -86,9 +87,13 @@ class VimNavigableListView(Static):
         filtered = self.run_search(query)
         list = self.query_one(ListView)
         list.clear()
-        list.extend(filtered)
-        list.focus()
-        list.index = 0
+        if len(filtered) > 0:
+            list.extend(filtered)
+            list.focus()
+            list.index = 0
+        else:
+            # Keep key handling on the container active when the list has no rows.
+            super().focus()
         return
 
     def _reset_search(self):
@@ -103,10 +108,12 @@ class VimNavigableListView(Static):
 
         if event.key == "escape":
             event.stop()
-            if self._is_filtered:
+            if self._search_mode or self._is_filtered:
                 self._search_mode = False
                 self._is_filtered = False
-                self._search_timer = None
+                if self._search_timer is not None:
+                    self._search_timer.stop()
+                    self._search_timer = None
                 self._reset_search()
             self.command = ""
             cl.command = ""

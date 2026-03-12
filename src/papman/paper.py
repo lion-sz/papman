@@ -77,16 +77,24 @@ class PaperList(VimNavigableListView):
         elements = [PaperListItem(p) for p in filtered]
         return elements
 
+    def _get_selected_paper(self) -> Entry | None:
+        item = self.highlighted_child
+        if item is None:
+            return None
+        return item.paper
+
     @on(ListView.Selected)
     def paper_details(self, event: ListView.Selected) -> None:
-        paper = self.highlighted_child.paper
+        paper = self._get_selected_paper()
         if paper is None:
-            raise ValueError("No paper selected")
+            return
         self.app.push_screen(PaperModal(paper))
 
     @work
     async def action_attach(self):
-        paper = self.highlighted_child.paper
+        paper = self._get_selected_paper()
+        if paper is None:
+            return
         if self.app.active_collection is None:
             self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
             return
@@ -116,7 +124,9 @@ class PaperList(VimNavigableListView):
             self.app.query_one(PapersModule).reload_papers()
 
     def action_open(self):
-        paper = self.highlighted_child.paper
+        paper = self._get_selected_paper()
+        if paper is None:
+            return
         if len(paper.files) > 0:
             success, msg = paper.files[0].open()
             if not success:
@@ -124,7 +134,9 @@ class PaperList(VimNavigableListView):
 
     @work
     async def action_edit(self):
-        paper = self.highlighted_child.paper
+        paper = self._get_selected_paper()
+        if paper is None:
+            return
         bib_source = self.app.library.get_entry_bibtex_source(paper.id)
         draft = await self.app.push_screen_wait(EntryEditScreen(bib_source))
         if draft is not None:
