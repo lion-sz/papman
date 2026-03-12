@@ -247,31 +247,33 @@ class MainSidebar(Static):
 
     @work(exclusive=True)
     async def reload_sidebar(self, section_to_focus: str | None = None):
-        old_list = self.query_one(SidebarList)
-        had_focus = old_list.has_focus
-        old_index = old_list.index
-        await old_list.remove()
-        new_list = SidebarList(*self._build_rows(), id="sidebar-list")
-        await self.mount(new_list)
-        if len(new_list.children) > 0:
+        sidebar_list = self.query_one(SidebarList)
+        list_view = sidebar_list.query_one(ListView)
+        had_focus = list_view.has_focus
+        old_index = sidebar_list.index
+        rows = self._build_rows()
+
+        sidebar_list.elems = rows
+        list_view.clear()
+        list_view.extend(rows)
+
+        if len(rows) > 0:
             if section_to_focus is None:
-                new_list.index = (
-                    0
-                    if old_index is None
-                    else min(old_index, len(new_list.children) - 1)
+                sidebar_list.index = (
+                    0 if old_index is None else min(old_index, len(rows) - 1)
                 )
             else:
-                new_list.index = 0
-                for idx, child in enumerate(new_list.children):
+                sidebar_list.index = 0
+                for idx, child in enumerate(rows):
                     if (
                         isinstance(child, SidebarRowItem)
                         and child.row_kind == "section"
                         and child.section == section_to_focus
                     ):
-                        new_list.index = idx
+                        sidebar_list.index = idx
                         break
         if had_focus:
-            new_list.focus()
+            sidebar_list.focus()
 
     @on(ListView.Selected, "#sidebar-list")
     def on_sidebar_selected(self, event: ListView.Selected):
