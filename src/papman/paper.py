@@ -97,6 +97,7 @@ class PaperList(VimNavigableListView):
         if key is None:
             return
         success, msg = self.app.active_collection.attach(paper, key)
+        self.app.collections.save()
         if not success:
             self.app.push_screen(MessageScreen(msg))
         else:
@@ -328,8 +329,10 @@ class AttachPaperScreen(ModalScreen):
         yield Footer()
 
     @on(Input.Submitted, "#attach-input")
-    def action_attach(self, event: Input.Submitted):
+    def submit_result(self, event: Input.Submitted):
         key = self.query_one(Input).value
+        if key is None or len(key) == 0:
+            key = self.paper.key
         self.dismiss(key)
 
     def action_on_escape(self) -> None:

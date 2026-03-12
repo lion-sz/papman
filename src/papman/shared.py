@@ -72,7 +72,7 @@ class VimNavigableListView(Static):
         return self.query_one(ListView).highlighted_child
 
     def compose(self):
-        yield ListView(*self.elems, id=self.id, classes="box")
+        yield ListView(*self.elems, id=self.id)
         command = CommandLine()
         command.display = False
         yield command
