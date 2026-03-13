@@ -19,7 +19,7 @@ from textual.widgets import (
 from textual.containers import Horizontal, Vertical
 
 from .shared import MessageScreen, FilePickerScreen, InputScreen
-from .shared import VimNavigableListView
+from .shared import VimNavList
 from .data.entry import Entry
 from .data.library import search_papers
 
@@ -52,7 +52,7 @@ class PaperListItem(ListItem):
             yield Label(tags_str, classes="paper-item-label paper-tags")
 
 
-class PaperList(VimNavigableListView):
+class PaperList(VimNavList):
     BINDINGS = [
         Binding("a", "attach", "Attach Paper"),
         Binding("c", "create", "Create Entry"),
@@ -380,7 +380,7 @@ class SelectReadingListScreen(ModalScreen):
                     key=lambda x: x.name.lower(),
                 )
             ]
-            yield VimNavigableListView(*items, id="reading-list-picker")
+            yield VimNavList(*items, id="reading-list-picker")
         yield Footer()
 
     def on_mount(self):

@@ -12,6 +12,7 @@ from textual.widgets import (
     Footer,
     ListView,
     ListItem,
+    Tree,
 )
 from textual.app import Binding, ComposeResult
 from textual.message import Message
@@ -35,7 +36,124 @@ class CommandLine(Widget):
         return self.command
 
 
-class VimNavigableListView(Static):
+class VimNavElem:
+    can_focus = True
+    command: str
+
+    KNONW_COMMANDS = ["j", "k"]
+    searchable: bool = False
+
+    _search_mode: bool
+    _search_timer: Timer | None
+    _before_search_index: int | None
+    _is_filtered: bool
+
+    def move(self, steps: int, up: bool):
+        raise NotImplementedError()
+
+    def _run_search(self, query: str):
+        raise NotImplementedError()
+
+    def _reset_search(self):
+        raise NotImplementedError()
+
+    async def _on_key(self, event: events.Key) -> None:
+        cl = self.query_one(CommandLine)
+
+        if self.searchable:
+            if event.key == "escape" and (self._search_mode or self._is_filtered):
+                event.stop()
+                self._search_mode = False
+                self._is_filtered = False
+                if self._search_timer is not None:
+                    self._search_timer.stop()
+                    self._search_timer = None
+                await self._reset_search()
+                self.command = ""
+                cl.command = ""
+                cl.display = False
+                return
+
+            if self._search_mode:
+                event.stop()
+                if self._search_timer is not None:
+                    self._search_timer.stop()
+                if event.key == "enter":
+                    self._search_mode = False
+                    self._search_timer = None
+                    self._run_search(self.command)
+                else:
+                    if event.key == "backspace":
+                        self.command = (
+                            self.command[:-1] if self.command else self.command
+                        )
+                    else:
+                        self.command = (
+                            self.command + event.character
+                            if event.character
+                            else self.command
+                        )
+                    cl.command = "/" + self.command
+                    self._search_timer = self.set_timer(
+                        0.2, lambda: self._run_search(self.command)
+                    )
+                return
+
+            if event.key == "slash":
+                event.stop()
+                self._before_search_index = self.index
+                self._is_filtered = True
+                self._search_mode = True
+                self.command = ""
+                cl.command = "/"
+                cl.display = True
+                return
+
+        handled = await self.handle_key(event)
+        if not handled and not self._is_bound_in_active_chain(event):
+            await self.on_unbound_key(event)
+
+    def _is_bound_in_active_chain(self, event: events.Key) -> bool:
+        try:
+            binding_chain = self.screen._modal_binding_chain
+        except Exception:
+            return False
+
+        for key in event.aliases:
+            if any(key in bindings.key_to_bindings for _, bindings in binding_chain):
+                return True
+
+        return False
+
+    async def on_unbound_key(self, event: events.Key) -> None:
+        """Hook for keys that don't resolve to a binding on this list view."""
+        cl = self.query_one(CommandLine)
+        if event.key not in self.KNOWN_COMMANDS:
+            if event.key == "backspace":
+                self.command = self.command[:-1] if self.command else self.command
+            else:
+                self.command = self.command + event.key
+            cl.command = self.command
+            if not cl.display:
+                cl.display = True
+            return
+        # Try parsing the modifier
+        if self.command is not None and self.command.isnumeric():
+            modifier = int(self.command)
+        else:
+            modifier = 1
+        self.command = ""
+        cl.command = ""
+        cl.display = False
+
+        if event.key in ("j", "k"):
+            self.move(modifier, event.key == "k")
+        if event.key == "escape":
+            pass
+        return
+
+
+class VimNavList(VimNavElem, Static):
     can_focus = True
     command: str
     elems: list[ListItem]
@@ -106,98 +224,6 @@ class VimNavigableListView(Static):
         list.index = self._before_search_index
         list.focus()
 
-    async def _on_key(self, event: events.Key) -> None:
-        cl = self.query_one(CommandLine)
-
-        if event.key == "escape":
-            event.stop()
-            if self._search_mode or self._is_filtered:
-                self._search_mode = False
-                self._is_filtered = False
-                if self._search_timer is not None:
-                    self._search_timer.stop()
-                    self._search_timer = None
-                await self._reset_search()
-            self.command = ""
-            cl.command = ""
-            cl.display = False
-            return
-
-        if self._search_mode:
-            event.stop()
-            if self._search_timer is not None:
-                self._search_timer.stop()
-            if event.key == "enter":
-                self._search_mode = False
-                self._search_timer = None
-                self._run_search(self.command)
-            else:
-                if event.key == "backspace":
-                    self.command = self.command[:-1] if self.command else self.command
-                else:
-                    self.command = (
-                        self.command + event.character
-                        if event.character
-                        else self.command
-                    )
-                cl.command = "/" + self.command
-                self._search_timer = self.set_timer(
-                    0.2, lambda: self._run_search(self.command)
-                )
-            return
-        if self.searchable and event.key == "slash":
-            event.stop()
-            self._before_search_index = self.index
-            self._is_filtered = True
-            self._search_mode = True
-            self.command = ""
-            cl.command = "/"
-            cl.display = True
-            return
-
-        handled = await self.handle_key(event)
-        if not handled and not self._is_bound_in_active_chain(event):
-            await self.on_unbound_key(event)
-
-    def _is_bound_in_active_chain(self, event: events.Key) -> bool:
-        try:
-            binding_chain = self.screen._modal_binding_chain
-        except Exception:
-            return False
-
-        for key in event.aliases:
-            if any(key in bindings.key_to_bindings for _, bindings in binding_chain):
-                return True
-
-        return False
-
-    async def on_unbound_key(self, event: events.Key) -> None:
-        """Hook for keys that don't resolve to a binding on this list view."""
-        cl = self.query_one(CommandLine)
-        if event.key not in self.KNOWN_COMMANDS:
-            if event.key == "backspace":
-                self.command = self.command[:-1] if self.command else self.command
-            else:
-                self.command = self.command + event.key
-            cl.command = self.command
-            if not cl.display:
-                cl.display = True
-            return
-        # Try parsing the modifier
-        if self.command is not None and self.command.isnumeric():
-            modifier = int(self.command)
-        else:
-            modifier = 1
-        self.command = ""
-        cl.command = ""
-        cl.display = False
-
-        if event.key in ("j", "k"):
-            self.move(modifier, event.key == "k")
-        if event.key == "escape":
-            pass
-        return
-
     def move(self, steps: int, up: bool):
         list = self.query_one(ListView)
         ind = list.index
@@ -207,6 +233,171 @@ class VimNavigableListView(Static):
         new_ind = ind + steps
         new_ind = max(0, min(new_ind, n_items - 1))
         list.index = new_ind
+        return
+
+
+class VimNavTree(VimNavElem, Static):
+    can_focus = True
+    command: str
+    elems: list[ListItem]
+
+    KNOWN_COMMANDS = ["j", "k", "escape"]
+    searchable: bool = False
+
+    _tree: Tree
+    _cl: CommandLine
+
+    _search_mode: bool
+    _search_timer: Timer | None
+    _before_search_index: int | None
+    _is_filtered: bool
+
+    def __init__(self, *items, **kwargs):
+        super().__init__(*items, **kwargs)
+        self.command = ""
+        self._search_mode = False
+        self._search_timer = None
+        self._before_search_index = None
+        self._is_filtered = False
+
+    def compose(self):
+        self._tree = self.build_tree()
+        yield self._tree
+        self._cl = CommandLine()
+        self._cl.display = False
+        yield self._cl
+
+    def focus(self):
+        self.query_one(Tree).focus()
+
+    @property
+    def cursor_line(self):
+        return self._tree.cursor_line
+
+    @cursor_line.setter
+    def set_cursor_line(self, value: int):
+        self._tree.cursor_line = value
+
+    @property
+    def cursor_node(self):
+        self._tree.cursor_node
+
+    def move(self, steps: int, up: bool):
+        pos = self._tree.cursor_line
+        if up:
+            steps = -steps
+        self._tree.cursor_line = pos + steps
+        return
+
+
+class FilteredDirTree(DirectoryTree):
+    file_types: list[str] | None
+    search_term: str
+
+    def __init__(self, path: str, file_types: list[str] | None = None, **kwargs):
+        super().__init__(path, **kwargs)
+        self.file_types = file_types
+        self.search_term = ""
+
+    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
+        p = [path for path in paths if not path.name.startswith(".")]
+        if self.file_types is not None:
+            p = [path for path in p if path.suffix in self.file_types or path.is_dir()]
+        if self.search_term:
+            p = [
+                path
+                for path in p
+                if self.search_term.lower() in path.name.lower() or path.is_dir()
+            ]
+        return p
+
+
+class VimNavDirTree(VimNavElem, Static):
+    class FileChosen(Message):
+        bubble: bool = True
+
+        def __init__(self, tree: "FilteredDirTree", path: Path) -> None:
+            self._tree = tree
+            self.path = path
+            super().__init__()
+
+    KNOWN_COMMANDS = ["j", "k", "escape"]
+    BINDINGS = [
+        Binding("enter", "select_cursor", "Select"),
+    ]
+
+    can_focus = True
+    command: str
+    elems: list[ListItem]
+
+    searchable: bool = True
+
+    _tree: FilteredDirTree
+    _cl: CommandLine
+
+    _search_mode: bool
+    _search_timer: Timer | None
+    _before_search_index: int | None
+    _is_filtered: bool
+
+    def __init__(self, path, file_types: list[str] | None = None, **kwargs):
+        super().__init__(path, **kwargs)
+        self.path = path
+        self.file_types = file_types
+        self.command = ""
+        self._search_mode = False
+        self._search_timer = None
+        self._before_search_index = None
+        self._is_filtered = False
+
+    @property
+    def index(self):
+        return self._tree.cursor_line
+
+    @index.setter
+    def index(self, value: int):
+        self._tree.cursor_line = value
+
+    @property
+    def cursor_line(self):
+        return self._tree.cursor_line
+
+    @cursor_line.setter
+    def set_cursor_line(self, value: int):
+        self._tree.cursor_line = value
+
+    def compose(self):
+        self._tree = FilteredDirTree(self.path)
+        yield self._tree
+        self._cl = CommandLine()
+        self._cl.display = False
+        yield self._cl
+
+    async def _run_search(self, query: str):
+        self._tree.search_term = query
+        await self._tree.reload()
+
+    async def _reset_search(self):
+        self._tree.search_term = ""
+        await self._tree.reload()
+
+    def focus(self):
+        self._tree.focus()
+
+    def move(self, steps: int, up: bool):
+        pos = self._tree.cursor_line
+        if up:
+            steps = -steps
+        self._tree.cursor_line = pos + steps
+        return
+
+    def action_select_cursor(self):
+        node = self._tree.cursor_node
+        if node.allow_expand:
+            node.expand()
+        else:
+            msg = self.FileChosen(self._tree, node.data.path)
+            self.post_message(msg)
         return
 
 
@@ -297,88 +488,9 @@ class ConfirmScreen(ModalScreen):
         self.dismiss(False)
 
 
-class FilteredDirectoryTree(DirectoryTree):
-    file_types: list[str] | None
-    search_term: str = ""
-
-    class FileChosen(Message):
-        bubble: bool = True
-
-        def __init__(self, tree: "FilteredDirectoryTree", path: Path) -> None:
-            self._tree = tree
-            self.path = path
-            super().__init__()
-
-    BINDINGS = [
-        Binding("enter", "select_cursor", "Select"),
-        Binding("escape", "on_escape", "Close"),
-        Binding("j", "cursor_down", "Down"),
-        Binding("k", "cursor_up", "Up"),
-    ]
-
-    def __init__(self, path: str, file_types: list[str] | None = None, **kwargs):
-        super().__init__(path, **kwargs)
-        self.file_types = file_types
-
-    def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
-        p = [path for path in paths if not path.name.startswith(".")]
-        if self.file_types is not None:
-            p = [path for path in p if path.suffix in self.file_types or path.is_dir()]
-        if self.search_term:
-            p = [
-                path
-                for path in p
-                if self.search_term.lower() in path.name.lower() or path.is_dir()
-            ]
-        return p
-
-    def action_select_cursor(self):
-        node = self.cursor_node
-        if node.allow_expand:
-            node.expand()
-        else:
-            msg = self.FileChosen(self, node.data.path)
-            self.post_message(msg)
-        return
-
-    def select_path(self, path: Path) -> None:
-        """Select the node for the given path, or its nearest visible ancestor."""
-        if not self.root:
-            return
-
-        target_path = path.expanduser().absolute()
-        best_node = self.root
-
-        # Helper to walk all loaded nodes
-        def walk_tree(node):
-            yield node
-            for child in node.children:
-                yield from walk_tree(child)
-
-        # Walk all loaded nodes to find the best match
-        for node in walk_tree(self.root):
-            if node.data:
-                try:
-                    node_path = node.data.path.expanduser().absolute()
-                    # If this node is the target or a parent of the target
-                    if target_path == node_path or node_path in target_path.parents:
-                        # We want the deepest match
-                        if not best_node.data or len(node_path.parts) > len(
-                            best_node.data.path.parts
-                        ):
-                            best_node = node
-                except (ValueError, AttributeError):
-                    continue
-
-        self.move_cursor(best_node)
-        self.scroll_to_node(best_node)
-
-
 class FilePickerScreen(ModalScreen):
     BINDINGS = [
-        ("enter", "select_file", "Select"),
         ("n", "create_new_file", "New File"),
-        ("slash", "show_search", "Search"),
         ("escape", "quit", "Quit"),
     ]
 
@@ -396,16 +508,11 @@ class FilePickerScreen(ModalScreen):
     def compose(self):
         with Vertical(classes="modal-content"):
             yield Static("Select a file", classes="module-title")
-            yield FilteredDirectoryTree("~", id="file-tree", file_types=self.file_types)
-            search_input = Input(
-                placeholder="Search...", id="search-input", classes="search-bar"
-            )
-            search_input.display = False
-            yield search_input
+            yield VimNavDirTree("~", id="file-tree", file_types=self.file_types)
         yield Footer()
 
-    @on(FilteredDirectoryTree.FileChosen)
-    def on_file_chosen(self, event: FilteredDirectoryTree.FileChosen) -> None:
+    @on(VimNavDirTree.FileChosen)
+    def on_file_chosen(self, event: VimNavDirTree.FileChosen) -> None:
         self.selected_file = event.path
         path = event.path
         self.log(f"Selected file: {path} ({type(path)})")
@@ -416,7 +523,7 @@ class FilePickerScreen(ModalScreen):
         if not self.allow_file_creation:
             return
         """Create a new empty file in the current directory."""
-        tree = self.query_one("#file-tree", FilteredDirectoryTree)
+        tree = self.query_one(VimNavDirTree)
 
         # Get the path at the current cursor location
         cursor_node = tree.cursor_node
@@ -451,47 +558,5 @@ class FilePickerScreen(ModalScreen):
                 MessageScreen(f"Could not create file: {str(e)}", is_error=True)
             )
 
-    def action_show_search(self):
-        tree = self.query_one("#file-tree", FilteredDirectoryTree)
-        search_input = self.query_one("#search-input", Input)
-
-        # Store current position if we're not already searching
-        if not search_input.display and tree.cursor_node and tree.cursor_node.data:
-            self.initial_path = tree.cursor_node.data.path
-
-        search_input.display = True
-        search_input.focus()
-
-    @on(Input.Changed, "#search-input")
-    def on_search_changed(self, event: Input.Changed):
-        if self._search_timer is not None:
-            self._search_timer.stop()
-        self._search_timer = self.set_timer(0.2, lambda: self._run_search(event.value))
-
-    @work(exclusive=True)
-    async def _run_search(self, value: str):
-        tree = self.query_one("#file-tree", FilteredDirectoryTree)
-        tree.search_term = value
-        tree.reload()
-
-    @on(Input.Submitted, "#search-input")
-    def on_search_submitted(self):
-        tree = self.query_one("#file-tree", FilteredDirectoryTree)
-        tree.focus()
-        self.query_one("#search-input", Input).display = False
-        if self.initial_path:
-            tree.select_path(self.initial_path)
-
     def action_quit(self):
-        search_input = self.query_one("#search-input", Input)
-        if search_input.display:
-            search_input.display = False
-            search_input.value = ""
-            tree = self.query_one("#file-tree", FilteredDirectoryTree)
-            tree.search_term = ""
-            tree.reload()
-            tree.focus()
-            if self.initial_path:
-                self.call_after_refresh(tree.select_path, self.initial_path)
-            return
         self.dismiss(None)

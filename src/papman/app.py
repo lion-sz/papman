@@ -1,12 +1,11 @@
 from textual import work, on
-from textual.binding import Binding
 from textual.reactive import reactive
 from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Static, Tree
 from .config import Config, load_config
 from .paper import PapersModule, PaperList
 from .collection import CollectionPanel, NewCollectionScreen
-from .shared import MessageScreen, InputScreen
+from .shared import MessageScreen, InputScreen, VimNavTree
 from .data.library import Library
 from .data.collection import Collection, Collections
 from .data.reading_list import ReadingLists
@@ -101,14 +100,11 @@ class MainModule(Static):
             self.query_one(CollectionPanel).focus()
 
 
-class SidebarTree(Tree):
-    BINDINGS = [
-        Binding("j", "cursor_down", "Down", show=False),
-        Binding("k", "cursor_up", "Up", show=False),
-        Binding("h", "cursor_parent", "Parent", show=False),
-        Binding("g", "scroll_home", "Top", show=False),
-        Binding("G", "scroll_end", "Bottom", show=False),
-    ]
+class SidebarTree(VimNavTree):
+    label: str
+    collections: dict[str, Collection]
+    reading_lists: list[str]
+    tags: list[str]
 
     def __init__(
         self,
@@ -119,24 +115,33 @@ class SidebarTree(Tree):
         **kwargs,
     ):
         super().__init__(label, **kwargs)
-        self.root.expand()
-        coll_elem = self.root.add("collections", expand=True)
-        for name, coll in collections.items():
+        self.label = label
+        self.collections = collections
+        self.reading_lists = reading_lists
+        self.tags = tags
+
+    def build_tree(self):
+        tree = Tree(self.label)
+        tree.root.expand()
+        coll_elem = tree.root.add("collections", expand=True)
+        for name, coll in self.collections.items():
             coll_elem.add_leaf(
                 f"{name} ({len(coll.papers)} papers)", data=("coll", name)
             )
         coll_elem.add_leaf("new collection", data=("new_coll", "new_collection"))
 
-        readings_elem = self.root.add("reading_lists", expand=False)
-        for name, reading_list in reading_lists.items():
+        readings_elem = tree.root.add("reading_lists", expand=False)
+        for name, reading_list in self.reading_lists.items():
             readings_elem.add_leaf(
                 f"{name} ({len(reading_list.paper_ids)} papers)", data=("rl", name)
             )
         readings_elem.add_leaf("new reading list", data=("new_rl", "new_reading_list"))
 
-        tags_elem = self.root.add("tags", expand=False)
-        for tag in tags:
+        tags_elem = tree.root.add("tags", expand=False)
+        for tag in self.tags:
             tags_elem.add(tag, data=("tags", tag))
+
+        return tree
 
     @on(Tree.NodeSelected)
     def on_selected(self, event: Tree.NodeSelected):
