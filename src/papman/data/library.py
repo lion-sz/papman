@@ -4,14 +4,12 @@ import requests
 import xml.etree.ElementTree as ET
 
 from .entry import Entry
-from .reading_list import ReadingLists
 from papman.config import Config
 
 
 class Library:
     path: Path
     entries: dict[UUID, Entry]
-    reading_lists: ReadingLists
 
     def __init__(self, config: Config):
         self.path = config.library_path
@@ -41,7 +39,6 @@ class Library:
                     self.entries[entry_id] = entry
         except ET.ParseError as e:
             print(f"Error parsing library.xml: {e}")
-        self.reading_lists = ReadingLists(self.path)
 
     def get_by_id(self, entry_id: UUID) -> Entry | None:
         """
@@ -124,7 +121,7 @@ class Library:
 
         # Parse each XML file and add its content to the library root
         for xml_file in xml_files:
-            if xml_file.name in {"library.xml", ReadingLists.FILE_NAME}:
+            if xml_file.name in {"library.xml", "collection.xml", "reading_lists.xml"}:
                 continue
             try:
                 tree = ET.parse(xml_file)
