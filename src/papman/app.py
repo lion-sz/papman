@@ -123,6 +123,7 @@ class SidebarTree(VimNavTree):
     def build_tree(self):
         tree = Tree(self.label)
         tree.root.expand()
+        tree.show_root = False
         coll_elem = tree.root.add("collections", expand=True)
         for name, coll in self.collections.items():
             coll_elem.add_leaf(
