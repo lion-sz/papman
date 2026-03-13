@@ -313,6 +313,18 @@ class FilteredDirTree(DirectoryTree):
 
 
 class VimNavDirTree(VimNavElem, Static):
+    DEFAULT_CSS = """
+    VimNavDirTree {
+        height: 1fr;
+        min-height: 0;
+    }
+
+    VimNavDirTree > FilteredDirTree {
+        height: 1fr;
+        min-height: 0;
+    }
+    """
+
     class FileChosen(Message):
         bubble: bool = True
 
@@ -367,7 +379,7 @@ class VimNavDirTree(VimNavElem, Static):
         self._tree.cursor_line = value
 
     def compose(self):
-        self._tree = FilteredDirTree(self.path)
+        self._tree = FilteredDirTree(self.path, file_types=self.file_types)
         yield self._tree
         self._cl = CommandLine()
         self._cl.display = False
@@ -508,7 +520,7 @@ class FilePickerScreen(ModalScreen):
     def compose(self):
         with Vertical(classes="modal-content"):
             yield Static("Select a file", classes="module-title")
-            yield VimNavDirTree("~", id="file-tree", file_types=self.file_types)
+            yield VimNavDirTree("~", file_types=self.file_types)
         yield Footer()
 
     @on(VimNavDirTree.FileChosen)

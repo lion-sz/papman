@@ -12,15 +12,6 @@ Screen {
     padding: 0 1;
 }
 
-#sidebar-list {
-    background: $primary-background;
-    border: none;
-}
-
-#sidebar-list > ListItem {
-    background: $primary-background;
-}
-
 #main {
     height: 1fr;
 }
@@ -29,10 +20,6 @@ PapersModule,
 CollectionPanel,
 ReadingListPanel {
     layout: vertical;
-    height: 1fr;
-}
-
-VimNavigableListView {
     height: 1fr;
 }
 
@@ -76,6 +63,7 @@ VimNavigableListView {
     background: $surface;
     width: 80%;
     height: 80%;
+    min-height: 0;
 }
 
 .dialog-content {
@@ -89,10 +77,6 @@ VimNavigableListView {
 
 .error {
     background: #840000;
-}
-
-.box {
-    border: solid green;
 }
 
 .entry-edit-screen {
@@ -114,26 +98,8 @@ VimNavigableListView {
     margin-top: 1;
 }
 
-.entry-edit-meta {
-    color: $text-muted;
-}
-
 .entry-edit-actions {
     margin-top: 2;
     align-horizontal: right;
     width: 100%;
-}
-
-#search-modal {
-    padding: 1 2;
-}
-
-#search-results {
-    height: 1fr;
-    margin-top: 1;
-    margin-bottom: 1;
-}
-
-#search-query {
-    dock: bottom;
 }
