@@ -109,6 +109,22 @@ class Library:
         self.populate()
         return True, "Entry updated."
 
+    def save_library(self):
+        """
+        Writes library.xml from the in-memory entries dict.
+        """
+        library_root = ET.Element("library")
+        for entry in self.entries.values():
+            library_root.append(entry.to_xml_element())
+
+        library_tree = ET.ElementTree(library_root)
+        ET.indent(library_tree, space="  ")
+        library_tree.write(
+            self.path / "library.xml",
+            encoding="utf-8",
+            xml_declaration=True,
+        )
+
     def populate(self):
         """
         Collects all XML files from the library folder and merges them into a single library.xml file.
@@ -194,7 +210,6 @@ class Library:
 
 
 def search_papers(papers: list[Entry], query: str) -> list[bool]:
-
     q = query.strip().lower()
     if not q:
         return papers

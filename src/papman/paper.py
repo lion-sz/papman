@@ -229,6 +229,8 @@ class PaperModal(ModalScreen):
         success, msg = self.paper.attach(path, self.app.library.path)
         if not success:
             self.app.push_screen(MessageScreen(msg))
+            return
+        self.app.library.save_library()
 
     @work
     async def action_add_tag(self):

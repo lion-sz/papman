@@ -147,7 +147,7 @@ class Entry:
             notes=notes,
         )
 
-    def save(self, library_path: Path):
+    def to_xml_element(self) -> ET.Element:
         attrib = {"id": str(self.id), "key": self.key}
         root = ET.Element("entry", attrib=attrib)
 
@@ -189,6 +189,10 @@ class Entry:
             t = ET.SubElement(tag_elem, "tag")
             t.text = tag
 
+        return root
+
+    def save(self, library_path: Path):
+        root = self.to_xml_element()
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
         tree.write(
