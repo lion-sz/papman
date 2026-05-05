@@ -179,7 +179,9 @@ class SidebarTree(VimNavTree):
         msg = f"Created collection {collection.name}"
         self.app.push_screen(MessageScreen(msg))
         self.app.active_collection = collection
-        self.app.query_one(MainSidebar).recompose()
+        await self.app.query_one(MainSidebar).reload_sidebar(
+            section_to_focus="collection"
+        )
 
     @work
     async def create_reading_list(self):
@@ -191,7 +193,9 @@ class SidebarTree(VimNavTree):
         success, msg = self.app.reading_lists.create(name)
         self.app.push_screen(MessageScreen(msg, is_error=not success))
         if success:
-            self.app.query_one(MainSidebar).recompose()
+            await self.app.query_one(MainSidebar).reload_sidebar(
+                section_to_focus="reading_lists"
+            )
 
 
 class MainSidebar(Static):
@@ -205,6 +209,9 @@ class MainSidebar(Static):
             reading_lists=self.app.reading_lists.lists,
             tags=[],
         )
+
+    async def reload_sidebar(self, section_to_focus: str | None = None) -> None:
+        await self.query_one(SidebarTree).recompose()
 
 
 class ReadingListPanel(Static):

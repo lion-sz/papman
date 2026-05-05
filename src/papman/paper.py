@@ -109,7 +109,7 @@ class PaperList(VimNavList):
         if not success:
             self.app.push_screen(MessageScreen(msg))
         else:
-            self.app.query_one("#main-sidebar").reload_sidebar(
+            await self.app.query_one("#main-sidebar").reload_sidebar(
                 section_to_focus="collection"
             )
 
@@ -249,7 +249,7 @@ class PaperModal(ModalScreen):
 
     @work
     async def action_add_to_reading_list(self):
-        reading_lists = self.app.library.reading_lists
+        reading_lists = self.app.reading_lists
         if len(reading_lists.lists) == 0:
             self.app.push_screen(
                 MessageScreen("No reading lists available. Create one in the sidebar.")
@@ -265,7 +265,7 @@ class PaperModal(ModalScreen):
         success, msg = reading_lists.add_paper(selected_list, self.paper.id)
         self.app.push_screen(MessageScreen(msg, is_error=not success))
         if success:
-            self.app.query_one("#main-sidebar").reload_sidebar(
+            await self.app.query_one("#main-sidebar").reload_sidebar(
                 section_to_focus="reading_lists"
             )
 
@@ -386,16 +386,13 @@ class SelectReadingListScreen(ModalScreen):
         yield Footer()
 
     def on_mount(self):
-        picker = self.query_one("#reading-list-picker", ListView)
-        if len(picker.children) > 0:
-            picker.index = 0
-        picker.focus()
+        self.query_one("#reading-list-picker", VimNavList).focus()
 
     def action_cancel(self):
         self.dismiss(None)
 
     def action_select(self):
-        picker = self.query_one("#reading-list-picker", ListView)
+        picker = self.query_one("#reading-list-picker", VimNavList)
         if picker.highlighted_child is None:
             self.dismiss(None)
             return
