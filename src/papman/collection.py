@@ -61,7 +61,7 @@ class CollectionPanel(Static):
         self.app.push_screen(
             MessageScreen("Removing paper from collection...", is_error=False)
         )
-        if self.app.collection is None:
+        if self.app.active_collection is None:
             self.app.push_screen(MessageScreen("No collection loaded", is_error=True))
             return
         if self.paperlist.highlighted_child is None:
@@ -69,21 +69,20 @@ class CollectionPanel(Static):
             return
 
         paper = self.paperlist.highlighted_child.paper
-        key = self.app.collection.papers[paper.id][0]
+        key = self.app.active_collection.papers[paper.id]
         confirmed = await self.app.push_screen_wait(
             ConfirmScreen(f"Remove '{key}' from collection?")
         )
         if not confirmed:
             return
 
-        success, msg = self.app.collection.remove(paper.id)
+        success, msg = self.app.active_collection.remove(paper.id)
         if not success:
             self.app.push_screen(MessageScreen(msg, is_error=True))
             return
 
-        await self.app.query_one("#main-sidebar").reload_sidebar(
-            section_to_focus="collection"
-        )
+        self.app.collections.save()
+        await self.app.reload_sidebar(section_to_focus="collection")
         self.app.query_one("CollectionPanel").refresh(recompose=True)
 
     @work

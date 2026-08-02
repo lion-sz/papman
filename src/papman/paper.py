@@ -109,9 +109,7 @@ class PaperList(VimNavList):
         if not success:
             self.app.push_screen(MessageScreen(msg))
         else:
-            await self.app.query_one("#main-sidebar").reload_sidebar(
-                section_to_focus="collection"
-            )
+            await self.app.reload_sidebar(section_to_focus="collection")
 
     @work
     async def action_create(self):
@@ -265,9 +263,7 @@ class PaperModal(ModalScreen):
         success, msg = reading_lists.add_paper(selected_list, self.paper.id)
         self.app.push_screen(MessageScreen(msg, is_error=not success))
         if success:
-            await self.app.query_one("#main-sidebar").reload_sidebar(
-                section_to_focus="reading_lists"
-            )
+            await self.app.reload_sidebar(section_to_focus="reading_lists")
 
     def action_edit_notes(self):
         temp_path: Path | None = None

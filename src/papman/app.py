@@ -62,6 +62,9 @@ class PapMan(App):
     def _focus_main_panel(self):
         self.query_one(MainModule).focus()
 
+    async def reload_sidebar(self, section_to_focus: str | None = None) -> None:
+        await self.query_one(MainSidebar).reload(section_to_focus=section_to_focus)
+
     @work
     async def action_import_entry(self):
         doi = await self.push_screen_wait(InputScreen("Import by DOI", "DOI"))
@@ -179,9 +182,7 @@ class SidebarTree(VimNavTree):
         msg = f"Created collection {collection.name}"
         self.app.push_screen(MessageScreen(msg))
         self.app.active_collection = collection
-        await self.app.query_one(MainSidebar).reload_sidebar(
-            section_to_focus="collection"
-        )
+        await self.app.reload_sidebar(section_to_focus="collection")
 
     @work
     async def create_reading_list(self):
@@ -193,9 +194,7 @@ class SidebarTree(VimNavTree):
         success, msg = self.app.reading_lists.create(name)
         self.app.push_screen(MessageScreen(msg, is_error=not success))
         if success:
-            await self.app.query_one(MainSidebar).reload_sidebar(
-                section_to_focus="reading_lists"
-            )
+            await self.app.reload_sidebar(section_to_focus="reading_lists")
 
 
 class MainSidebar(Static):
@@ -210,8 +209,11 @@ class MainSidebar(Static):
             tags=[],
         )
 
-    async def reload_sidebar(self, section_to_focus: str | None = None) -> None:
+    async def reload(self, section_to_focus: str | None = None) -> None:
         await self.query_one(SidebarTree).recompose()
+
+    async def reload_sidebar(self, section_to_focus: str | None = None) -> None:
+        await self.reload(section_to_focus=section_to_focus)
 
 
 class ReadingListPanel(Static):
